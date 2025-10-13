@@ -13,6 +13,7 @@ class AFN:
         self.Alfabeto = set()        
         self.EdosAceptacion = set()  
 
+    # Se crean AFN básicos que se podrán unir entre ellos
     def CrearBasicoUno(self, c):
         e1 = Estado()
         e2 = Estado()
@@ -32,7 +33,7 @@ class AFN:
         self.Estados.add(e1)
         self.Estados.add(e2) 
         self.EdoInicial = e1
-        e1.Transiciones.add(Transicion(c1, c2,e2))
+        e1.Transiciones.add(Transicion(c1, c2, e2))
         e2.EdoAcept = True
         self.EdosAceptacion.add(e2)
 
@@ -43,13 +44,11 @@ class AFN:
         return self
     
     def UnirAFN(self, F2):
-        e1 = Estado()  
-        e2 = Estado()  
+        e1 = Estado()
+        e2 = Estado()
 
         e1.Transiciones.add(Transicion(EPSILON, self.EdoInicial))
         e1.Transiciones.add(Transicion(EPSILON, F2.EdoInicial))
-
-        e1.Transiciones.add(Transicion(EPSILON, e2))
 
         for e in self.EdosAceptacion:
             e.Transiciones.add(Transicion(EPSILON, e2))
@@ -69,8 +68,6 @@ class AFN:
         self.Alfabeto.update(F2.Alfabeto)
 
         return self
-
-
     
     def ConcatenarAFN(self, F2):
         for e in self.EdosAceptacion:
@@ -199,6 +196,7 @@ class AFN:
 
     def ConvertirAAFD(self):
         afd = AFD()
+        # C es igual a 
         C = []
         Q = deque()
         NumElemSj = 0
@@ -212,11 +210,12 @@ class AFN:
         C.append(Sj0)
         Q.append(Sj0)
 
-        while Q:
+        while Q: # Se calculan todos los Ir_A de acuerdo a los estados Q que se van obteniendo
             SjAct = Q.popleft()
-            for c in sorted(self.Alfabeto):  # ← alfabeto ordenado
-                if c == EPSILON:  # ← saltar epsilon
+            for c in sorted(self.Alfabeto):  # alfabeto ordenado
+                if c == EPSILON:  # saltar epsilon
                     continue
+
                 nuevo_conjunto = self.IrA(SjAct.s, c)
                 if not nuevo_conjunto:
                     continue
