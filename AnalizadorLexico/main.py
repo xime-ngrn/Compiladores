@@ -14,6 +14,7 @@ def actualizarContador(cont_AFN):
 def actualizarContador2(cont_AFD):
     cont_AFD.set(f"Numero total de AFD's: {len(afds)}")
 
+
 def obtener_indice(entry, log_fun):
     if entry is None:
         log_fun("Error! No se ha detectado ningun Entry.")
@@ -196,40 +197,6 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
 
     print(f"Numero de AFN's totales {len(afns)}\n")
 
-def unirAFN(afn1, afn2, log_fun, cont_AFN):
-    print("Opcion seleccionada unir AFN\n")
-
-    if(len(afns) < 2):
-        log_fun("Error! Se necesitan al menos 2 AFN's para realizar esta operacion.")
-        return
-
-    num1 = obtener_indice(afn1, log_fun)
-    num2 = obtener_indice(afn2, log_fun)
-    print(f"Numeros obtenidos: {num1} - {num2}")
-
-    if num1 is None:
-        log_fun("Error! Ingrese el número del AFN 1.")
-        return
-
-    if num2 is None:
-        log_fun("Error! Ingrese el número del AFN 2.")
-        return
-
-    if num1 == num2:
-        log_fun("Error! No se puede unir un AFN consigo mismo.")
-        return
-
-    a1 = afns[num1 - 1]
-    a2 = afns[num2 - 1]
-
-    a1.UnirAFN(a2)
-    afns.pop(num2 - 1)
-
-    actualizarContador(cont_AFN)
-
-    log_fun(f"Se ha creado la unión entre los AFN's {num1} y {num2}.")
-    imprimir_afn(a1, log_fun)
-
 def concatenarAFN(afn1, afn2, log_fun, cont_AFN):
     print("Opcion seleccionada concatenar AFN\n")
 
@@ -312,6 +279,53 @@ def opcional(afn, log_fun):
     log_fun(f"Se ha creado la operacion opcional del AFN.")
     imprimir_afn(a, log_fun)
 
+# Funciones para hacer los AFD
+def unirAFNS(num_afns, log_fun, cont_AFN):
+    if num_afns is None:
+        log_fun("Error! No se ha detectado ningun AFN")
+        return 
+
+    raw = num_afns.get().strip()
+    print("Entry obtenido ", raw)
+    if raw == "":
+        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
+        num_afns.focus_set()
+        return
+
+    try:
+        indices = sorted(set(int(x.strip()) - 1 for x in raw.split(",")))
+    except ValueError:
+        log_fun("Error! Solo se permiten numeros separados por comas y sin espacios.")
+        num_afns.focus_set()
+        return
+    
+    print("Indices obtenidos ", indices)
+    for i in indices:
+        if (i < 0) or (i >= len(afns)):
+            log_fun(f"Error! El indice {i + 1} no es valido.")
+            num_afns.focus_set()
+            return
+    
+    if len(indices) < 2:
+        log_fun("Error! Se deben seleccionar al menos 2 AFN's para unir.")
+        num_afns.focus_set()
+        return
+    
+    i_base = indices[0]
+    base_afn = afns[i_base]
+
+    # Unir los demás AFNs al base
+    for i in reversed(indices[1:]):
+        afn_a_unir = afns[i]
+        base_afn.UnirAFNs([afn_a_unir])
+        afns.pop(i)
+
+    # Actualizar
+    actualizarContador(cont_AFN)
+    
+    log_fun(f"✅ Unión completada! AFN {i_base + 1} ahora contiene la unión.")
+    imprimir_afn(base_afn, log_fun)
+
 def hacerAFD(afn, log_fun, cont_AFD):
     print("Opcion seleccionada convertir a AFD\n")
 
@@ -327,6 +341,7 @@ def hacerAFD(afn, log_fun, cont_AFD):
 
     log_fun(f"Se ha creado el AFD a partir del AFN {num}.")
     imprimir_afd(afd, log_fun)
+
 
 
 def main():
@@ -393,12 +408,27 @@ def main():
 
 
     # Pestaña 2
-    tk.Label(pestaña2, text="Convertir a un AFD", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
-    tk.Label(pestaña2, text="Ingrese el numero del AFN:", bg="thistle1").pack()
-    num_AFN = tk.Entry(pestaña2, width=5, justify='center')
-    num_AFN.pack(pady=5)
-    tk.Button(pestaña2, text="   Ejecutar   ", command=lambda: hacerAFD(num_AFN, log_resultado, cont_AFD)).pack(pady=10)
+    notebookAFD = ttk.Notebook(pestaña2)
+    notebookAFD.pack(expand = True, fill = "both", padx = 10, pady = 10)
+    sub1AFD = tk.Frame(notebookAFD, bg = "thistle1") # Unir AFNS
+    sub2AFD = tk.Frame(notebookAFD, bg = "thistle1") # Hacer AFD
 
+    notebookAFD.add(sub1AFD, text = "Unir AFN's")
+    notebookAFD.add(sub2AFD, text = "Hacer AFD")
+
+    # Unir AFN's
+    tk.Label(sub1AFD, text=" Unir AFN's ", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
+    tk.Label(sub1AFD, text="Seleccione los AFN's a Unir:", bg="thistle1").pack()
+    num_AFNS = tk.Entry(sub1AFD, width=5, justify='center')
+    num_AFNS.pack(pady=5)
+    tk.Button(sub1AFD, text="   Ejecutar   ", command = lambda: unirAFNS(num_AFNS, log_resultado, cont_AFN)).pack(pady=10)
+
+
+    tk.Label(sub2AFD, text="Convertir a un AFD", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
+    tk.Label(sub2AFD, text="Ingrese el numero del AFN:", bg="thistle1").pack()
+    num_AFN = tk.Entry(sub2AFD, width=5, justify='center')
+    num_AFN.pack(pady=5)
+    tk.Button(sub2AFD, text="   Ejecutar   ", command = lambda: hacerAFD(num_AFN, log_resultado, cont_AFN)).pack(pady=10)
 
     # Pestaña 3
     tk.Label(pestaña3, text="Descargar AFD a Txt", font=("Arial", 11, "bold"), bg="lightblue").pack(pady=20)
@@ -414,19 +444,17 @@ def main():
 
     sub1 = tk.Frame(notebookAFN, bg="lavender") # Crear basico 1
     sub2 = tk.Frame(notebookAFN, bg="lavender") # Crear basico 2
-    sub3 = tk.Frame(notebookAFN, bg="lavender") # Unir
-    sub4 = tk.Frame(notebookAFN, bg="lavender") # Concatenar
-    sub5 = tk.Frame(notebookAFN, bg="lavender") # Cerradura +
-    sub6 = tk.Frame(notebookAFN, bg="lavender") # Cerradura *
-    sub7 = tk.Frame(notebookAFN, bg="lavender") # Opcional
+    sub3 = tk.Frame(notebookAFN, bg="lavender") # Concatenar
+    sub4 = tk.Frame(notebookAFN, bg="lavender") # Cerradura +
+    sub5 = tk.Frame(notebookAFN, bg="lavender") # Cerradura *
+    sub6 = tk.Frame(notebookAFN, bg="lavender") # Opcional ?
 
     notebookAFN.add(sub1, text="Crear B1")
     notebookAFN.add(sub2, text="Crear B2")
-    notebookAFN.add(sub3, text="Unir")
-    notebookAFN.add(sub4, text="Concatenar")
-    notebookAFN.add(sub5, text="Cerradura +")
-    notebookAFN.add(sub6, text="Cerradura *")
-    notebookAFN.add(sub7, text="Opcional ?")
+    notebookAFN.add(sub3, text="Concatenar")
+    notebookAFN.add(sub4, text="Cerradura +")
+    notebookAFN.add(sub5, text="Cerradura *")
+    notebookAFN.add(sub6, text="Opcional ?")
     
     # AFN Basico 1
     tk.Label(sub1, text=" AFN Basico 1 ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
@@ -445,46 +473,36 @@ def main():
     ec3.pack(pady=5)
     tk.Button(sub2, text="   Ejecutar   ", command=lambda: crearBasico2(ec2, ec3, log_resultado, cont_AFN)).pack(pady=10)
 
-    # AFN Unir
-    tk.Label(sub3, text=" Unir AFN's ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
+    # AFN Concatenar
+    tk.Label(sub3, text=" Concatenar AFN's ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
     tk.Label(sub3, text="Ingrese el numero del AFN 1:", bg="lavender").pack()
     ec4 = tk.Entry(sub3, width=5, justify='center')
     ec4.pack(pady=5)
     tk.Label(sub3, text="Ingrese el numero del AFN 2:", bg="lavender").pack()
     ec5 = tk.Entry(sub3, width=5, justify='center')
     ec5.pack(pady=5)
-    tk.Button(sub3, text="   Ejecutar   ", command=lambda: unirAFN(ec4, ec5, log_resultado, cont_AFN)).pack(pady=10)
-
-    # AFN Concatenar
-    tk.Label(sub4, text=" Concatenar AFN's ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub4, text="Ingrese el numero del AFN 1:", bg="lavender").pack()
-    ec6 = tk.Entry(sub4, width=5, justify='center')
-    ec6.pack(pady=5)
-    tk.Label(sub4, text="Ingrese el numero del AFN 2:", bg="lavender").pack()
-    ec7 = tk.Entry(sub4, width=5, justify='center')
-    ec7.pack(pady=5)
-    tk.Button(sub4, text="   Ejecutar   ", command=lambda: concatenarAFN(ec6, ec7, log_resultado, cont_AFN)).pack(pady=10)
+    tk.Button(sub3, text="   Ejecutar   ", command=lambda: concatenarAFN(ec4, ec5, log_resultado, cont_AFN)).pack(pady=10)
 
     # AFN Cerradura Positiva
-    tk.Label(sub5, text=" Cerradura Positiva ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub5, text="Ingrese el numero del AFN:", bg="lavender").pack()
-    ec8 = tk.Entry(sub5, width=5, justify='center')
-    ec8.pack(pady=5)
-    tk.Button(sub5, text="   Ejecutar   ", command=lambda: cerrPostiva(ec8, log_resultado)).pack(pady=10)
+    tk.Label(sub4, text=" Cerradura Positiva ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
+    tk.Label(sub4, text="Ingrese el numero del AFN:", bg="lavender").pack()
+    ec6 = tk.Entry(sub4, width=5, justify='center')
+    ec6.pack(pady=5)
+    tk.Button(sub4, text="   Ejecutar   ", command=lambda: cerrPostiva(ec6, log_resultado)).pack(pady=10)
 
     # AFN Cerradura de Kleene
-    tk.Label(sub6, text=" Cerradura de Kleene ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub6, text="Ingrese el numero del AFN:", bg="lavender").pack()
-    ec9 = tk.Entry(sub6, width=5, justify='center')
-    ec9.pack(pady=5)
-    tk.Button(sub6, text="   Ejecutar   ", command=lambda: cerrKleene(ec9, log_resultado)).pack(pady=10)
+    tk.Label(sub5, text=" Cerradura de Kleene ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
+    tk.Label(sub5, text="Ingrese el numero del AFN:", bg="lavender").pack()
+    ec7 = tk.Entry(sub5, width=5, justify='center')
+    ec7.pack(pady=5)
+    tk.Button(sub5, text="   Ejecutar   ", command=lambda: cerrKleene(ec7, log_resultado)).pack(pady=10)
 
     # AFN Opcional
-    tk.Label(sub7, text=" Opcional ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub7, text="Ingrese el numero del AFN:", bg="lavender").pack()
-    ec10 = tk.Entry(sub7, width=5, justify='center')
-    ec10.pack(pady=5)
-    tk.Button(sub7, text="   Ejecutar   ", command=lambda: opcional(ec10, log_resultado)).pack(pady=10)
+    tk.Label(sub6, text=" Opcional ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
+    tk.Label(sub6, text="Ingrese el numero del AFN:", bg="lavender").pack()
+    ec8 = tk.Entry(sub6, width=5, justify='center')
+    ec8.pack(pady=5)
+    tk.Button(sub6, text="   Ejecutar   ", command=lambda: opcional(ec8, log_resultado)).pack(pady=10)
 
 
     ventana.mainloop()

@@ -43,32 +43,6 @@ class AFN:
 
         return self
     
-    def UnirAFN(self, F2):
-        e1 = Estado()
-        e2 = Estado()
-
-        e1.Transiciones.add(Transicion(EPSILON, self.EdoInicial))
-        e1.Transiciones.add(Transicion(EPSILON, F2.EdoInicial))
-
-        for e in self.EdosAceptacion:
-            e.Transiciones.add(Transicion(EPSILON, e2))
-            e.EdoAcept = False
-        for e in F2.EdosAceptacion:
-            e.Transiciones.add(Transicion(EPSILON, e2))
-            e.EdoAcept = False
-
-        e2.EdoAcept = True
-
-        self.EdoInicial = e1
-        self.Estados.update(F2.Estados)
-        self.Estados.add(e1)
-        self.Estados.add(e2)
-        self.EdosAceptacion.clear()
-        self.EdosAceptacion.add(e2)
-        self.Alfabeto.update(F2.Alfabeto)
-
-        return self
-    
     def ConcatenarAFN(self, F2):
         for e in self.EdosAceptacion:
             for t in F2.EdoInicial.Transiciones:
@@ -145,6 +119,38 @@ class AFN:
 
         return self
     
+    # Unir varios AFn's a un mismo inicio para realizar el analizador léxico
+    def UnirAFNs(self, lista_AFNs):
+        # Crear un nuevo estado inicial
+        nuevo_inicial = Estado()
+
+        # Establecer que NO hay un único estado de aceptación global
+        nuevos_estados_aceptacion = set()
+
+        for afn in [self] + lista_AFNs:
+            nuevo_inicial.Transiciones.add(Transicion(EPSILON, afn.EdoInicial))
+
+            for e in afn.EdosAceptacion:
+                e.EdoAcept = True
+                nuevos_estados_aceptacion.add(e)
+
+        self.EdoInicial = nuevo_inicial
+        self.EdosAceptacion = nuevos_estados_aceptacion
+
+        nuevos_estados = {nuevo_inicial}
+        nuevos_alfabeto = set()
+
+        for afn in [self] + lista_AFNs:
+            nuevos_estados.update(afn.Estados)
+            nuevos_alfabeto.update(afn.Alfabeto)
+
+        self.Estados = nuevos_estados
+        self.Alfabeto = nuevos_alfabeto
+
+        return self
+    
+
+    # Operaciones para pasar un AFN -> AFD
     def CerraduraEpsilonUno(self, e):
         c = set()
         p = [e]
