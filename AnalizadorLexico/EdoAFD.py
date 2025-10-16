@@ -1,5 +1,5 @@
 class EdoAFD():
     def __init__(self): 
-        self.transAFD = {}
+        self.transAFD = [-1] * 256
         self.id = -1
         self.Token = -1

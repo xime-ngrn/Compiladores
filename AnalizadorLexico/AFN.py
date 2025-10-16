@@ -285,7 +285,7 @@ class AFN:
 
         afd.NumEdos = len(C)
         while len(afd.EdosAFD) < len(C):
-            afd.EdosAFD.append(EdoAFD)
+            afd.EdosAFD.append(EdoAFD())
 
         for i in range(len(C)):
             afd.EdosAFD[i].id = i

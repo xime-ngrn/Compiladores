@@ -1,4 +1,3 @@
-import sys
 from EdoAFD import EdoAFD
 
 class AFD():
@@ -44,7 +43,7 @@ class AFD():
                 self.EdosAFD = []
                 estados = list(map(int, lineas[0].split()))
                 self.NumEdos = len(estados)
-                
+
                 for i in estados:
                     edo = EdoAFD()
                     edo.id = i
@@ -98,6 +97,7 @@ class AFD():
     def evaluarCad(self, cadena):
         resultados = {}
         inicio = 0
+        estados_por_id = {edo.id: edo for edo in self.EdosAFD if edo is not None}
 
         while inicio < len(cadena):
             est_actual = self.EdoInicial
@@ -116,33 +116,38 @@ class AFD():
                 
                 print(f"  > Pos {i}, Carácter '{c}'. Estado actual: {est_actual}")
 
+                if est_actual not in estados_por_id:
+                    # Verificar si el estado tiene la transiciónif est_actual not in estados_por_id:
+                    print(f"  > Detenido: Estado {est_actual} no existe en el AFD.")
+                    break
+            
+                edo_actual = estados_por_id[est_actual]
+                
                 # Verificar si el estado tiene la transición
-                try:
-                    destino = self.EdosAFD[est_actual].transAFD.get(idx)
-                except IndexError:
-                    print(f"Estado {est_actual} fuera de los límites de EdosAFD.")
-                    break 
+                destino = None
+                if 0 <= idx < len(edo_actual.transAFD):
+                    destino = edo_actual.transAFD[idx]
+                    if destino == -1:
+                        destino = None
                     
                 if destino is not None:
                     est_actual = destino
                     
-                    if est_actual == -1 or est_actual not in range(len(self.EdosAFD)):
-                        # El destino no es un estado accesible o es el estado trampa
-                        print(f"  > Detenido: Transición a estado inválido/trampa ({est_actual}).")
+                    # Validar que el destino sea un estado válido
+                    if est_actual not in estados_por_id:
+                        print(f"  > Detenido: Transición a estado inválido ({est_actual}).")
                         break 
 
                     # Registrar la coincidencia si el nuevo estado es de aceptación
                     if est_actual in self.EdosAceptacion:
-                        token_valido_actual = getattr(self.EdosAFD[est_actual], "Token", -1)
+                        token_valido_actual = getattr(estados_por_id[est_actual], "Token", -1)
                         
-                        # Solo actualizamos la longitud_valida si encontramos un token válido
+                        # Solo actualizamos si encontramos un token válido
                         if token_valido_actual != -1: 
                             longitud_valida = i - inicio + 1
                             token_valido = token_valido_actual
-                            ultimo_estado_valido = est_actual # Registrar el estado de aceptación
-                            print(f"  > ✅ Coincidencia temporal: Longitud {longitud_valida}, Token {token_valido}.")
-                        else:
-                            pass
+                            ultimo_estado_valido = est_actual
+                            print(f"  >Coincidencia temporal: Longitud {longitud_valida}, Token {token_valido}.")
                     
                     i += 1
                 else:
@@ -152,17 +157,16 @@ class AFD():
 
             if longitud_valida > 0:
                 lexema = cadena[inicio : inicio + longitud_valida]
-                
                 resultados[lexema] = token_valido 
-                
+
                 print(f"*** Lexema Encontrado: '{lexema}' (Token {token_valido}) ***")
                 
                 inicio += longitud_valida
-                
             else:
                 # No se encontró ninguna coincidencia válida
                 print(f"Error Léxico! Carácter no reconocido en posición {inicio}: '{cadena[inicio]}'")
                 print("El AFD no pudo formar un lexema válido con el carácter actual.")
-                return -1
+                resultados[cadena[inicio]] = "ERROR"
+                inicio += 1
 
         return resultados

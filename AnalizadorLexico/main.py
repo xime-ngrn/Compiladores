@@ -255,22 +255,29 @@ def probarAFD(ruta, cad, log_fun):
         log_fun(f"Lexemas encontrados en {cad}")
         
         for x, y in res.items():
-            log_fun(f"{y} - {x}")
+            log_fun(f"{x} : {y}")
 
         log_fun("==========================\n")
 
 
 # Opciones del AFN
-def crearBasico1(entry_widget, log_fun, cont_AFN):
+def crearBasico1(entry_widget, token, log_fun, cont_AFN):
     print("Opcion seleccionada de Crear Basico\n")
 
     caracter = entry_widget.get().strip()
     entry_widget.delete(0, tk.END)
 
-    token_val = (len(afns)  + 1) * 10
+    token_raw = token.get().strip()
+    token.delete(0, tk.END)
+
+    if not token_raw.isdigit():
+        messagebox.showerror("Error!", "El token debe ser un número.")
+        token.focus_set()
+
+    token_val = int(token_raw)
 
     print(f"Caracter recibido: {caracter}\n")
-    print(f"Token asignado automáticamente: {token_val}\n")
+    print(f"Token asignado: {token_val}\n")
 
     if not caracter:
         messagebox.showerror("Error!", "Debes ingresar al menos un caracter para crear un AFN básico")
@@ -291,7 +298,7 @@ def crearBasico1(entry_widget, log_fun, cont_AFN):
 
     print(f"Numero de AFN's totales {len(afns)}\n")
 
-def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
+def crearBasico2(entry_widget1, entry_widget2, token, log_fun, cont_AFN):
     print("Opcion seleccionada de Crear Basico\n")
 
     caracter1 = entry_widget1.get().strip()
@@ -299,10 +306,17 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
     entry_widget1.delete(0, tk.END)
     entry_widget2.delete(0, tk.END)
 
-    token_val = (len(afns) + 1) * 10
+    token_raw = token.get().strip()
+    token.delete(0, tk.END)
+
+    if not token_raw.isdigit():
+        messagebox.showerror("Error!", "El token debe ser un número.")
+        token.focus_set()
+
+    token_val = int(token_raw)
 
     print(f"Caracteres recibidos: {caracter1, caracter2}\n")
-    print(f"Token asignado automáticamente: {token_val}\n")
+    print(f"Token asignado: {token_val}\n")
 
     if(not caracter1) and (not caracter2):
         messagebox.showerror("Error!", "Debes ingresar al menos un caracter para crear un AFN básico.")
@@ -536,11 +550,14 @@ def main():
 
     # Contenedor de pestañas de panel_r
     tk.Label(panel_r, text = "Historial", fg = "black", bg = "white", font = ("Arial", 10, "bold")).pack(pady = 5)
-    text_r = tk.Text(panel_r, wrap = tk.WORD, height = 20, width = 50, bg="#fafafa", relief="flat")
-    scrollbar = tk.Scrollbar(panel_r, command = text_r.yview)
-    text_r.config(yscrollcommand = scrollbar.set)
+    text_r = tk.Text(panel_r, wrap="none", height = 20, width = 50, bg="#fafafa", relief="flat")
+    scrollbar_y = tk.Scrollbar(panel_r, orient="vertical", command = text_r.yview)
+    text_r.config(yscrollcommand = scrollbar_y.set)
+    scrollbar_x = tk.Scrollbar(panel_r, orient="horizontal", command=text_r.xview)
+    text_r.config(xscrollcommand=scrollbar_x.set)
 
-    scrollbar.pack(side = tk.RIGHT, fill = tk.Y)
+    scrollbar_y.pack(side = tk.RIGHT, fill = tk.Y)
+    scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
     text_r.pack(fill = "both", expand = True, padx = 5, pady = 5)
 
     def log_resultado(mensaje):
@@ -584,7 +601,7 @@ def main():
     # Unir AFN's
     tk.Label(sub1AFD, text=" Unir AFN's ", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
     tk.Label(sub1AFD, text="Seleccione los AFN's a Unir (índices separados por comas sin espacios):", bg="thistle1").pack()
-    num_AFNS = tk.Entry(sub1AFD, width=5, justify='center')
+    num_AFNS = tk.Entry(sub1AFD, width=45, justify='center')
     num_AFNS.pack(pady=5)
     tk.Button(sub1AFD, text="   Ejecutar   ", command = lambda: unirAFNS(num_AFNS, log_resultado, cont_AFN)).pack(pady=10)
 
@@ -642,7 +659,10 @@ def main():
     tk.Label(sub1, text="Ingrese un caracter:", bg="lavender").pack()
     ec1 = tk.Entry(sub1, width=5, justify='center')
     ec1.pack(pady=5)
-    tk.Button(sub1, text="   Ejecutar   ", command=lambda: crearBasico1(ec1, log_resultado, cont_AFN)).pack(pady=15)
+    tk.Label(sub1, text="Ingrese el token:", bg="lavender").pack()
+    tk1 = tk.Entry(sub1, width=5, justify='center')
+    tk1.pack(pady=5)
+    tk.Button(sub1, text="   Ejecutar   ", command=lambda: crearBasico1(ec1, tk1, log_resultado, cont_AFN)).pack(pady=15)
 
     # AFN Basico 2
     tk.Label(sub2, text=" AFN Basico 2 ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
@@ -652,7 +672,10 @@ def main():
     tk.Label(sub2, text="Ingrese otro caracter:", bg="lavender").pack()
     ec3 = tk.Entry(sub2, width=5, justify='center')
     ec3.pack(pady=5)
-    tk.Button(sub2, text="   Ejecutar   ", command=lambda: crearBasico2(ec2, ec3, log_resultado, cont_AFN)).pack(pady=10)
+    tk.Label(sub2, text="Ingrese el token:", bg="lavender").pack()
+    tk2 = tk.Entry(sub2, width=5, justify='center')
+    tk2.pack(pady=5)
+    tk.Button(sub2, text="   Ejecutar   ", command=lambda: crearBasico2(ec2, ec3, tk2, log_resultado, cont_AFN)).pack(pady=10)
 
     # AFN Unir
     tk.Label(sub3, text="Unir AFN's").pack(pady=20)
