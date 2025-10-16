@@ -61,51 +61,45 @@ def imprimir_afd(afd, log_fun):
     log_fun(f"Estados totales: {afd.NumEdos}")
     log_fun(f"Estado inicial: {afd.EdoInicial}")
     log_fun(f"Estados de aceptación: {afd.EdosAceptacion}")
-    log_fun(f"Alfabeto: {sorted(afd.Alfabeto)}\n")
+    
+    alfabeto_ordenado = sorted(afd.Alfabeto)
+    log_fun(f"Alfabeto: {alfabeto_ordenado}\n")
 
-    for edo in afd.EdosAFD:
-        if edo is None or edo.id == -1:
-            continue
-        log_fun(f"Estado {edo.id}:")
-        for i, dest in enumerate(edo.transAFD):
-            if dest != -1:
-                log_fun(f"\tcon '{chr(i)}' -> {dest}")
-    log_fun("\n===============\n")
+    log_fun(f"* = Estado de Aceptación, > = Estado Inicial")
+    log_fun("\n==========================\n")
 
-def guardarArchivo(afd, log_fun):
-    if afd is None:
+def guardarArchivo(afd_entry, log_fun, afds):
+    if afd_entry is None:
         log_fun("Error! No se ha detectado ninguna entrada en el AFD.")
+        return
 
-    raw = afd.get().strip()
+    raw = afd_entry.get().strip()
 
     if raw == "":
         log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
-        afd.focus_set()
+        afd_entry.focus_set()
         return None
 
     if not raw.isdigit():
         log_fun(f"Error! '{raw}' no es un número valido.")
-        afd.focus_set()
+        afd_entry.focus_set()
         return None
 
     num = int(raw)
-
-    if num < 1 or num > len(afds):
-        log_fun(f"Error: no existe un AFN con el numero {num}.")
-        afd.focus_set()
+    
+    # Manejo del caso donde 'afds' no existe o está vacío.
+    if not afds or num < 1 or num > len(afds):
+        log_fun(f"Error: no existe un AFD con el numero {num} o la lista de AFDs está vacía.")
+        afd_entry.focus_set()
         return None
     
-    afd.delete(0, tk.END)
-
-    if (num is None) or (num > len(afds)):
-        log_fun("Error! El numero de AFD indicado no existe.")
-        return
+    afd_entry.delete(0, tk.END)
     
-    afdG = afds[num - 1]
+    afdG = afds[num - 1] 
 
     ruta = filedialog.asksaveasfilename(
         defaultextension=".txt",
-        initialfile="afd_resultado.txt",
+        initialfile="afd_resultado_tabla.txt",
         title="Guardar AFD como",
         filetypes=(("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*"))
     )
@@ -116,36 +110,212 @@ def guardarArchivo(afd, log_fun):
 
     try:
         with open(ruta, "w", encoding="utf-8") as archivo:
+            # 1. Información General
             archivo.write("=== AFD GENERADO ===\n")
-            archivo.write(f"Estados: {[edo.id for edo in afdG.EdosAFD if edo is not None and edo.id != -1]}\n")
+            archivo.write(f"Estados: {afdG.NumEdos}\n")
             archivo.write(f"Inicial: {afdG.EdoInicial}\n")
             archivo.write(f"Aceptacion: {' '.join(str(e) for e in afdG.EdosAceptacion)}\n")
-            archivo.write(f"Alfabeto: {sorted(afdG.Alfabeto)}\n")
-
-            # Escribir las transiciones
-            for edo in afdG.EdosAFD:
-                if edo is None or edo.id == -1:
-                    continue
-                transiciones_str = []
-                for i, dest in enumerate(edo.transAFD):
-                    if dest != -1:
-                        transiciones_str.append(f"('{chr(i)}'->{dest})")
-                archivo.write(f"Estado {edo.id}: " + ", ".join(transiciones_str) + "\n")
             
-        messagebox.showinfo("Felicidades!", f"AFD guardado correctamente en: {ruta}\n")
-        log_fun(f"AFD {num} guardado correctamente en {ruta}")
+            alfabeto_ordenado = sorted(afdG.Alfabeto)
+            archivo.write(f"Alfabeto: {alfabeto_ordenado}\n\n") 
+
+            #Tabla de transiciones
+            archivo.write("=== TABLA DE TRANSICIONES ===\n")
+            
+            # Determinar el ancho máximo para los estados y destinos
+            max_state_len = max(len(str(edo.id)) for edo in afdG.EdosAFD if edo and edo.id != -1) if afdG.EdosAFD else 2
+            max_token_len = max(len(str(getattr(edo, 'Token', '-1'))) for edo in afdG.EdosAFD if edo and edo.id != -1) if afdG.EdosAFD else 2
+            
+            # El ancho de la columna debe ser al menos 3 para cubrir los símbolos, estados y los guiones (-)
+            col_w = max(3, max_state_len, max_token_len)
+            
+            # Construir la primera fila (encabezado de transiciones)
+            header_symbols = ""
+            for s in alfabeto_ordenado:
+                # Usar center() para que los símbolos queden centrados en la columna
+                header_symbols += s.center(col_w) + " "
+            
+            # Escribir el encabezado del alfabeto
+            # Se añade un espacio antes para alinear con la primera columna de la tabla real (la de los estados)
+            archivo.write(" " * col_w + " " + header_symbols.rstrip() + "\n")
+            
+            # 2. Cuerpo de la matriz
+            for edo in afdG.EdosAFD:
+                if edo is None or edo.id == -1 or edo.id >= afdG.NumEdos:
+                    continue
+                
+                # --- Columna ESTADO ---
+                # Escribir el ID del estado (sin el símbolo > o *)
+                # Se utiliza ljust() para asegurar la alineación de la primera columna
+                fila_str = str(edo.id).ljust(col_w) + " "
+                
+                # --- Columnas de TRANSICIONES (Alfabeto) ---
+                for simbolo_char in alfabeto_ordenado:
+                    idx = ord(simbolo_char)
+                    destino = -1 # Trampa
+                    
+                    if idx < len(edo.transAFD):
+                        destino = edo.transAFD[idx]
+                    
+                    # El destino puede ser un solo estado o una lista/conjunto de estados (para NFA, aunque aquí es AFD)
+                    # Usamos '-' si el destino es -1 (trampa)
+                    destino_str = str(destino) if destino != -1 else "-"
+                    
+                    # El destino debe ser centrado en la columna
+                    fila_str += destino_str.center(col_w) + " "
+                
+                # --- Columna TOKEN ---
+                token = getattr(edo, 'Token', -1)
+                token_val = str(token) if token != -1 else "-"
+                
+                # El token debe ser centrado o alineado para mantener el formato de matriz
+                fila_str += token_val.center(col_w)
+                
+                # Escribir la fila
+                archivo.write(fila_str + "\n")
+            
+            archivo.write("\n")
+            archivo.write("\n==========================\n")
+            
+            messagebox.showinfo("Felicidades!", f"AFD guardado correctamente en: {ruta}\n")
+            log_fun(f"AFD {num} guardado correctamente en {ruta}")
             
     except Exception as e:
         messagebox.showinfo("Error!", f"No se ha podido guardar el AFD.\n")
         log_fun(f"Error! {e}.")
 
+
+""" Comentando mi hermosa creacion porque a la señorita no le gusta :c
+def guardarArchivo(afd_entry, log_fun):
+    if afd_entry is None:
+        log_fun("Error! No se ha detectado ninguna entrada en el AFD.")
+        return
+
+    raw = afd_entry.get().strip()
+
+    if raw == "":
+        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
+        afd_entry.focus_set()
+        return None
+
+    if not raw.isdigit():
+        log_fun(f"Error! '{raw}' no es un número valido.")
+        afd_entry.focus_set()
+        return None
+
+    num = int(raw)
+    
+    if num < 1 or num > len(afds):
+        log_fun(f"Error: no existe un AFD con el numero {num}.")
+        afd_entry.focus_set()
+        return None
+    
+    afd_entry.delete(0, tk.END)
+    
+    afdG = afds[num - 1] # Obtener el objeto AFD (índice 0-based)
+
+    ruta = filedialog.asksaveasfilename(
+        defaultextension=".txt",
+        initialfile="afd_resultado_tabla.txt",
+        title="Guardar AFD como",
+        filetypes=(("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*"))
+    )
+
+    if not ruta:
+        log_fun("Error! Guardado cancelado por el usuario.")
+        return
+
+    try:
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            # 1. Información General
+            archivo.write("=== AFD GENERADO ===\n")
+            archivo.write(f"Estados: {afdG.NumEdos}\n")
+            archivo.write(f"Inicial: {afdG.EdoInicial}\n")
+            archivo.write(f"Aceptacion: {' '.join(str(e) for e in afdG.EdosAceptacion)}\n")
+            
+            alfabeto_ordenado = sorted(afdG.Alfabeto)
+            archivo.write(f"Alfabeto: {alfabeto_ordenado}\n\n") 
+
+            #Tabla de transiciones
+            archivo.write("=== TABLA DE TRANSICIONES ===\n")
+
+            # Definir el ancho de las columnas
+            col_estado_w = 6
+            col_token_w = 8
+            col_simbolo_w = 8
+            
+            # Encabezados
+            header_parts = ["Edo".ljust(col_estado_w)]
+            for s in alfabeto_ordenado:
+                header_parts.append(s.center(col_simbolo_w))
+            header_parts.append("TOKEN".ljust(col_token_w))
+            
+            header_str = f"| {' | '.join(header_parts)} |"
+            separator = "=" * len(header_str)
+            
+            # Escribir encabezado
+            archivo.write(separator + "\n")
+            archivo.write(header_str + "\n")
+            archivo.write(separator + "\n")
+
+            # Filas de transiciones
+            for edo in afdG.EdosAFD:
+                if edo is None or edo.id == -1 or edo.id >= afdG.NumEdos:
+                    continue
+                
+                # --- Columna ESTADO (Omitida para brevedad) ---
+                simbolo_edo = ""
+                if edo.id in afdG.EdosAceptacion: 
+                    simbolo_edo = "*"
+                if edo.id == afdG.EdoInicial:
+                    simbolo_edo = ">"
+                
+                fila = [f"{simbolo_edo}{edo.id}".ljust(col_estado_w)]
+                
+                # --- Columnas de TRANSICIONES (Alfabeto) (Omitida para brevedad) ---
+                for simbolo_char in alfabeto_ordenado:
+                    idx = ord(simbolo_char)
+                    destino = -1 # Trampa
+                    
+                    if idx < len(edo.transAFD):
+                        destino = edo.transAFD[idx]
+                    
+                    destino_str = str(destino) if destino != -1 else "-"
+                    fila.append(destino_str.center(col_simbolo_w))
+                
+                token = getattr(edo, 'Token', -1)
+                
+                token_val = str(token) if token != -1 else "-"
+                
+                fila.append(token_val.ljust(col_token_w))
+                
+                # Escribir la fila
+                archivo.write(f"| {' | '.join(fila)} |\n")
+
+            archivo.write(separator + "\n")
+            archivo.write(f"* = Estado de Aceptación, > = Estado Inicial\n")
+            archivo.write("\n")
+            
+            archivo.write("\n==========================\n")
+            
+            messagebox.showinfo("Felicidades!", f"AFD guardado correctamente en: {ruta}\n")
+            log_fun(f"AFD {num} guardado correctamente en {ruta}")
+            
+    except Exception as e:
+        messagebox.showinfo("Error!", f"No se ha podido guardar el AFD.\n")
+        log_fun(f"Error! {e}.")
+"""
 # Opciones del AFN
 def crearBasico1(entry_widget, log_fun, cont_AFN):
     print("Opcion seleccionada de Crear Basico\n")
 
     caracter = entry_widget.get().strip()
     entry_widget.delete(0, tk.END)
+
+    token_val = (len(afns)  + 1) * 10
+
     print(f"Caracter recibido: {caracter}\n")
+    print(f"Token asignado automáticamente: {token_val}\n")
 
     if not caracter:
         log_fun("Error! Debes ingresar al menos un caracter para crear un AFN basico")
@@ -156,7 +326,7 @@ def crearBasico1(entry_widget, log_fun, cont_AFN):
         caracter = caracter[0]
         
     afn1 = AFN()
-    afn1.CrearBasicoUno(caracter)
+    afn1.CrearBasicoUno(caracter, token_val)
     afns.append(afn1)
 
     actualizarContador(cont_AFN)
@@ -174,7 +344,10 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
     entry_widget1.delete(0, tk.END)
     entry_widget2.delete(0, tk.END)
 
+    token_val = (len(afns) + 1) * 10
+
     print(f"Caracteres recibidos: {caracter1, caracter2}\n")
+    print(f"Token asignado automáticamente: {token_val}\n")
 
     if(not caracter1) and (not caracter2):
         log_fun(f"Error! Debes ingresar al menos un caracter para crear un AFN basico")
@@ -187,7 +360,7 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
         caracter2 = caracter2[0]
         
     afn1 = AFN()
-    afn1.CrearBasicoDos(caracter1, caracter2)
+    afn1.CrearBasicoDos(caracter1, caracter2, token_val)
     afns.append(afn1)
 
     actualizarContador(cont_AFN)
@@ -435,7 +608,7 @@ def main():
     tk.Label(pestaña3, text="Ingrese el numero del AFD:", bg="lightblue").pack()
     num_AFD = tk.Entry(pestaña3, width=5, justify='center')
     num_AFD.pack(pady=5)
-    tk.Button(pestaña3, text="   Ejecutar   ", command=lambda: guardarArchivo(num_AFD, log_resultado)).pack(pady=10)
+    tk.Button(pestaña3, text="   Ejecutar   ", command=lambda: guardarArchivo(num_AFD, log_resultado, afds)).pack(pady=10)
 
 
     # Subpestañas del AFN (Pestaña 1)

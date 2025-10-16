@@ -2,6 +2,7 @@ from Estado import Estado
 from Transicion import Transicion
 from AFD import AFD
 from ElemSj import ElemSj
+from EdoAFD import EdoAFD
 from collections import deque
 
 EPSILON = 'ε'
@@ -14,7 +15,7 @@ class AFN:
         self.EdosAceptacion = set()  
 
     # Se crean AFN básicos que se podrán unir entre ellos
-    def CrearBasicoUno(self, c):
+    def CrearBasicoUno(self, c, token):
         e1 = Estado()
         e2 = Estado()
         self.Estados.add(e1)
@@ -22,24 +23,26 @@ class AFN:
         self.EdoInicial = e1
         e1.Transiciones.add(Transicion(c,e2))
         e2.EdoAcept = True
+        e2.Token = token
         self.Alfabeto.add(c)
         self.EdosAceptacion.add(e2)
 
         return self
     
-    def CrearBasicoDos(self, c1, c2):
+    def CrearBasicoDos(self, c1, c2, token):
         e1 = Estado()
         e2 = Estado()
         self.Estados.add(e1)
         self.Estados.add(e2) 
         self.EdoInicial = e1
-        e1.Transiciones.add(Transicion(c1, c2, e2))
+        e1.Transiciones.add(Transicion(c_inf=c1, c_sup=c2, edoDestino=e2))
         e2.EdoAcept = True
+        e2.Token = token
         self.EdosAceptacion.add(e2)
 
         for i in range(ord(c1), ord(c2) + 1):
             simbolo = chr(i)
-            self.Alfabeto.add(simbolo)
+            self.Alfabeto.add(simbolo)  
 
         return self
     
@@ -52,7 +55,7 @@ class AFN:
         self.EdosAceptacion.clear()
         self.EdosAceptacion.update(F2.EdosAceptacion)
         self.Alfabeto.update(F2.Alfabeto)
-        #F2.Estados.discard(F2.EdoInicial)
+        F2.Estados.discard(F2.EdoInicial)
         self.Estados.update(F2.Estados)
 
         return self
@@ -201,57 +204,70 @@ class AFN:
         return -1
 
     def ConvertirAAFD(self):
-        afd = AFD()
-        # C es igual a 
-        C = []
-        Q = deque()
-        NumElemSj = 0
+            afd = AFD()
+            C = []
+            Q = deque()
+            NumElemSj = 0
 
-        # Crear el conjunto S0 con la cerradura epsilon del estado inicial
-        Sj0 = ElemSj()
-        Sj0.s = self.CerraduraEpsilonUno(self.EdoInicial)
-        Sj0.id = NumElemSj
-        NumElemSj += 1
+            Sj0 = ElemSj()
+            Sj0.s = self.CerraduraEpsilonUno(self.EdoInicial)
+            Sj0.id = NumElemSj
+            NumElemSj += 1
 
-        C.append(Sj0)
-        Q.append(Sj0)
+            C.append(Sj0)
+            Q.append(Sj0)
 
-        while Q: # Se calculan todos los Ir_A de acuerdo a los estados Q que se van obteniendo
-            SjAct = Q.popleft()
-            for c in sorted(self.Alfabeto):  # alfabeto ordenado
-                if c == EPSILON:  # saltar epsilon
-                    continue
+            while Q:
+                SjAct = Q.popleft()
+                for c in sorted(self.Alfabeto):
+                    if c == EPSILON:
+                        continue
 
-                nuevo_conjunto = self.IrA(SjAct.s, c)
-                if not nuevo_conjunto:
-                    continue
+                    nuevo_conjunto = self.IrA(SjAct.s, c)
+                    
+                    if not nuevo_conjunto:
+                        continue
 
-                NumEdo = self.Buscar(C, nuevo_conjunto)
-                if NumEdo == -1:
-                    # Nuevo conjunto de estados
-                    SjAux = ElemSj()
-                    SjAux.s = nuevo_conjunto
-                    SjAux.id = NumElemSj
-                    NumElemSj += 1
-                    C.append(SjAux)
-                    Q.append(SjAux)
-                    afd.AgregarTransicion(SjAct.id, SjAux.id, c)
-                else:
-                    afd.AgregarTransicion(SjAct.id, C[NumEdo].id, c)
+                    NumEdo = self.Buscar(C, nuevo_conjunto)
+                    if NumEdo == -1:
+                        SjAux = ElemSj()
+                        SjAux.s = nuevo_conjunto
+                        SjAux.id = NumElemSj
+                        NumElemSj += 1
+                        C.append(SjAux)
+                        Q.append(SjAux)
+                        afd.AgregarTransicion(SjAct.id, SjAux.id, c)
+                    else:
+                        afd.AgregarTransicion(SjAct.id, C[NumEdo].id, c)
 
-        # Determinar estados de aceptación
-        for Sj in C:
-            for e in Sj.s:
-                if e.EdoAcept:
+            # INICIALIZACIÓN Y ASIGNACIÓN DE PROPIEDADES
+            afd.NumEdos = len(C)
+            while len(afd.EdosAFD) < len(C):
+                afd.EdosAFD.append(EdoAFD())
+
+            for i in range(len(C)):
+                afd.EdosAFD[i].id = i
+
+            for Sj in C:
+                token_encontrado = -1
+                es_aceptacion_afd = False 
+
+                for e in Sj.s:
+                    if e.EdoAcept:
+                        es_aceptacion_afd = True
+                    
+                    if token_encontrado == -1 and e.Token != -1:
+                        token_encontrado = e.Token
+                            
+                if es_aceptacion_afd:
                     afd.EdosAceptacion.add(Sj.id)
-                    break
+                    
+                if token_encontrado != -1:
+                    afd.EdosAFD[Sj.id].Token = token_encontrado
+                    
 
-        afd.EdoInicial = 0
-        afd.Alfabeto = {c for c in self.Alfabeto if c != EPSILON}
-        afd.NumEdos = len(afd.EdosAFD)
-
-        # Asignar ids consistentes
-        for i, edo in enumerate(afd.EdosAFD):
-            edo.id = i
-
-        return afd
+            afd.EdoInicial = 0
+            afd.Alfabeto = {c for c in self.Alfabeto if c != EPSILON}
+            afd.NumEdos = len(afd.EdosAFD)
+            
+            return afd
