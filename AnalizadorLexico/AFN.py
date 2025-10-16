@@ -46,6 +46,38 @@ class AFN:
 
         return self
     
+    def UnirAFN(self, F2):
+        e1 = Estado()  
+        e2 = Estado()
+
+        e1.Transiciones.add(Transicion(EPSILON, self.EdoInicial))
+        e1.Transiciones.add(Transicion(EPSILON, F2.EdoInicial))
+
+        for e in self.EdosAceptacion:
+            e.Transiciones.add(Transicion(EPSILON, e2))
+            e.EdoAcept = False
+        for e in F2.EdosAceptacion:
+            e.Transiciones.add(Transicion(EPSILON, e2))
+            e.EdoAcept = False
+
+        e2.EdoAcept = True
+
+        if self.EdosAceptacion:
+            primer_estado_acep = next(iter(self.EdosAceptacion))
+            e2.Token = primer_estado_acep.Token if hasattr(primer_estado_acep, 'Token') else -1
+        else:
+            e2.Token = -1
+
+        self.EdoInicial = e1
+        self.Estados.update(F2.Estados)
+        self.Estados.add(e1)
+        self.Estados.add(e2)
+        self.EdosAceptacion.clear()
+        self.EdosAceptacion.add(e2)
+        self.Alfabeto.update(F2.Alfabeto)
+
+        return self
+    
     def ConcatenarAFN(self, F2):
         for e in self.EdosAceptacion:
             for t in F2.EdoInicial.Transiciones:
@@ -114,6 +146,12 @@ class AFN:
 
         e2.EdoAcept = True
 
+        if self.EdosAceptacion:
+            estado_acep_original = next(iter(self.EdosAceptacion))
+            e2.Token = estado_acep_original.Token if hasattr(estado_acep_original, 'Token') else -1
+        else:
+            e2.Token = -1
+
         self.EdoInicial = e1
         self.Estados.add(e1)
         self.Estados.add(e2)
@@ -152,7 +190,6 @@ class AFN:
 
         return self
     
-
     # Operaciones para pasar un AFN -> AFD
     def CerraduraEpsilonUno(self, e):
         c = set()
@@ -204,70 +241,75 @@ class AFN:
         return -1
 
     def ConvertirAAFD(self):
-            afd = AFD()
-            C = []
-            Q = deque()
-            NumElemSj = 0
+        afd = AFD()
+        C = []
+        Q = deque()
+        NumElemSj = 0
 
-            Sj0 = ElemSj()
-            Sj0.s = self.CerraduraEpsilonUno(self.EdoInicial)
-            Sj0.id = NumElemSj
-            NumElemSj += 1
+        # Creación del Estado Inicial del AFD (S0)
+        Sj0 = ElemSj()
+        Sj0.s = self.CerraduraEpsilonUno(self.EdoInicial)
+        Sj0.id = NumElemSj
+        NumElemSj += 1
 
-            C.append(Sj0)
-            Q.append(Sj0)
+        C.append(Sj0)
+        Q.append(Sj0)
 
-            while Q:
-                SjAct = Q.popleft()
-                for c in sorted(self.Alfabeto):
-                    if c == EPSILON:
-                        continue
+        # Construcción de Subconjuntos a partir del estado inicial
+        while Q:
+            SjAct = Q.popleft()
+            for c in sorted(self.Alfabeto):
+                if c == EPSILON:
+                    continue
 
-                    nuevo_conjunto = self.IrA(SjAct.s, c)
-                    
-                    if not nuevo_conjunto:
-                        continue
+                nuevo_conjunto = self.IrA(SjAct.s, c)
+                
+                # Manejo del Estado Trampa (Conjunto Vacío)
+                if not nuevo_conjunto:
+                    continue
 
-                    NumEdo = self.Buscar(C, nuevo_conjunto)
-                    if NumEdo == -1:
-                        SjAux = ElemSj()
-                        SjAux.s = nuevo_conjunto
-                        SjAux.id = NumElemSj
-                        NumElemSj += 1
-                        C.append(SjAux)
-                        Q.append(SjAux)
-                        afd.AgregarTransicion(SjAct.id, SjAux.id, c)
-                    else:
-                        afd.AgregarTransicion(SjAct.id, C[NumEdo].id, c)
+                NumEdo = self.Buscar(C, nuevo_conjunto)
+                
+                if NumEdo == -1:
+                    # Nuevo conjunto de estados (Agregar a C y Q)
+                    SjAux = ElemSj()
+                    SjAux.s = nuevo_conjunto
+                    SjAux.id = NumElemSj
+                    NumElemSj += 1
+                    C.append(SjAux)
+                    Q.append(SjAux)
+                    afd.AgregarTransicion(SjAct.id, SjAux.id, c)
+                else:
+                    # Conjunto de estados ya existente
+                    afd.AgregarTransicion(SjAct.id, C[NumEdo].id, c)
 
-            # INICIALIZACIÓN Y ASIGNACIÓN DE PROPIEDADES
-            afd.NumEdos = len(C)
-            while len(afd.EdosAFD) < len(C):
-                afd.EdosAFD.append(EdoAFD())
+        afd.NumEdos = len(C)
+        while len(afd.EdosAFD) < len(C):
+            afd.EdosAFD.append(EdoAFD)
 
-            for i in range(len(C)):
-                afd.EdosAFD[i].id = i
+        for i in range(len(C)):
+            afd.EdosAFD[i].id = i
 
-            for Sj in C:
-                token_encontrado = -1
-                es_aceptacion_afd = False 
-
-                for e in Sj.s:
-                    if e.EdoAcept:
-                        es_aceptacion_afd = True
-                    
-                    if token_encontrado == -1 and e.Token != -1:
-                        token_encontrado = e.Token
-                            
-                if es_aceptacion_afd:
-                    afd.EdosAceptacion.add(Sj.id)
-                    
-                if token_encontrado != -1:
-                    afd.EdosAFD[Sj.id].Token = token_encontrado
-                    
-
-            afd.EdoInicial = 0
-            afd.Alfabeto = {c for c in self.Alfabeto if c != EPSILON}
-            afd.NumEdos = len(afd.EdosAFD)
+        # Asignación de Aceptación y Token
+        for Sj in C:
+            token_encontrado = -1
+            es_aceptacion_afd = False
             
-            return afd
+            for e in Sj.s:
+                if e.EdoAcept:
+                    es_aceptacion_afd = True
+                    
+                if token_encontrado == -1 and e.Token != -1:
+                    token_encontrado = e.Token
+                    
+            if es_aceptacion_afd:
+                afd.EdosAceptacion.add(Sj.id)
+                
+            if token_encontrado != -1:
+                afd.EdosAFD[Sj.id].Token = token_encontrado
+                
+        afd.EdoInicial = 0
+        afd.Alfabeto = {c for c in self.Alfabeto if c != EPSILON}
+        afd.NumEdos = len(afd.EdosAFD)
+        
+        return afd

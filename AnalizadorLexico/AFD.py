@@ -1,3 +1,4 @@
+import sys
 from EdoAFD import EdoAFD
 
 class AFD():
@@ -35,5 +36,133 @@ class AFD():
         # Registrar transición
         self.EdosAFD[desde].transAFD[ord(simbolo)] = hacia
 
-    
+    def cargarArchivo(self, ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                lineas = [line.strip() for line in archivo.readlines() if line.strip()]
+                
+                self.EdosAFD = []
+                estados = list(map(int, lineas[0].split()))
+                self.NumEdos = len(estados)
+                
+                for i in estados:
+                    edo = EdoAFD()
+                    edo.id = i
+                    self.EdosAFD.append(edo)
 
+                self.EdoInicial = int(lineas[1])
+                self.EdosAceptacion = set(map(int, lineas[2].split()))
+                
+                simbolos_en_orden = lineas[3].split() 
+                self.Alfabeto = set(simbolos_en_orden) 
+
+                # LECTURA DE LA TABLA DE TRANSICIONES
+                tabla = lineas[4:]
+
+                for i, linea in enumerate(tabla):
+                    partes = linea.split()
+                    
+                    # El número de transiciones debe ser igual al número de símbolos.
+                    num_simbolos = len(simbolos_en_orden)
+                    transiciones_destino = partes[:num_simbolos]
+                    
+                    # Verificación de longitud de la línea
+                    if len(partes) != num_simbolos + 1:
+                         print(f"Error de formato en la línea {i+5}!")
+                         print(f"Esperado: {num_simbolos} transiciones + 1 token. Encontrado: {len(partes)}")
+                         continue
+                         
+                    token = partes[-1]
+                    
+                    # Asignar Token
+                    if token.isdigit() or (token.startswith('-') and token[1:].isdigit()):
+                        self.EdosAFD[i].Token = int(token)
+                    else:
+                        self.EdosAFD[i].Token = -1
+
+                    transiciones_del_estado = []
+                    for idx_simb, simb in enumerate(simbolos_en_orden):
+                        destino = transiciones_destino[idx_simb]
+                        
+                        if destino != "-":
+                            self.EdosAFD[i].transAFD[ord(simb)] = int(destino)
+                            transiciones_del_estado.append((simb, int(destino)))
+                        else:
+                            transiciones_del_estado.append((simb, destino))
+
+        except FileNotFoundError:
+            print(f"Error! Archivo no encontrado en la ruta: {ruta}")
+        except Exception as e:
+            print(f"Error! No se ha podido cargar el archivo. Detalles: {e}")
+
+    def evaluarCad(self, cadena):
+        resultados = {}
+        inicio = 0
+
+        while inicio < len(cadena):
+            est_actual = self.EdoInicial
+            i = inicio
+            
+            # Variables para rastrear la coincidencia más larga (Maximal Munch)
+            longitud_valida = 0
+            token_valido = -1
+            ultimo_estado_valido = -1
+
+            print(f"\n--- Iniciando escaneo desde índice {inicio} ('{cadena[inicio:]}') ---")
+
+            while i < len(cadena):
+                c = cadena[i]
+                idx = ord(c)
+                
+                print(f"  > Pos {i}, Carácter '{c}'. Estado actual: {est_actual}")
+
+                # Verificar si el estado tiene la transición
+                try:
+                    destino = self.EdosAFD[est_actual].transAFD.get(idx)
+                except IndexError:
+                    print(f"Estado {est_actual} fuera de los límites de EdosAFD.")
+                    break 
+                    
+                if destino is not None:
+                    est_actual = destino
+                    
+                    if est_actual == -1 or est_actual not in range(len(self.EdosAFD)):
+                        # El destino no es un estado accesible o es el estado trampa
+                        print(f"  > Detenido: Transición a estado inválido/trampa ({est_actual}).")
+                        break 
+
+                    # Registrar la coincidencia si el nuevo estado es de aceptación
+                    if est_actual in self.EdosAceptacion:
+                        token_valido_actual = getattr(self.EdosAFD[est_actual], "Token", -1)
+                        
+                        # Solo actualizamos la longitud_valida si encontramos un token válido
+                        if token_valido_actual != -1: 
+                            longitud_valida = i - inicio + 1
+                            token_valido = token_valido_actual
+                            ultimo_estado_valido = est_actual # Registrar el estado de aceptación
+                            print(f"  > ✅ Coincidencia temporal: Longitud {longitud_valida}, Token {token_valido}.")
+                        else:
+                            pass
+                    
+                    i += 1
+                else:
+                    # No hay transición: el lexema terminó
+                    print(f"  > Detenido: No hay transición para el carácter '{c}' desde estado {est_actual}.")
+                    break
+
+            if longitud_valida > 0:
+                lexema = cadena[inicio : inicio + longitud_valida]
+                
+                resultados[lexema] = token_valido 
+                
+                print(f"*** Lexema Encontrado: '{lexema}' (Token {token_valido}) ***")
+                
+                inicio += longitud_valida
+                
+            else:
+                # No se encontró ninguna coincidencia válida
+                print(f"Error Léxico! Carácter no reconocido en posición {inicio}: '{cadena[inicio]}'")
+                print("El AFD no pudo formar un lexema válido con el carácter actual.")
+                return -1
+
+        return resultados

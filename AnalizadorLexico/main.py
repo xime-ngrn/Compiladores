@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from AFN import AFN, EPSILON
+from AFD import AFD
 
 # Definimos una lista de los AFN y AFD que se van creando
 afns = []
@@ -9,31 +10,31 @@ afds = []
 
 # Funciones adicionales necesarias
 def actualizarContador(cont_AFN):
-    cont_AFN.set(f"Numero total de AFN's: {len(afns)}")
+    cont_AFN.set(f"Número total de AFN's: {len(afns)}")
 
 def actualizarContador2(cont_AFD):
-    cont_AFD.set(f"Numero total de AFD's: {len(afds)}")
+    cont_AFD.set(f"Número total de AFD's: {len(afds)}")
 
 
-def obtener_indice(entry, log_fun):
+def obtener_indice(entry):
     if entry is None:
-        log_fun("Error! No se ha detectado ningun Entry.")
+        messagebox.showerror("Error!", "No se ha detectado ningún Entry.")
 
     raw = entry.get().strip()
     if raw == "":
-        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
+        messagebox.showerror("Error!", "El campo esta vacío. Ingrese un número válido.")
         entry.focus_set()
         return None
 
     if not raw.isdigit():
-        log_fun(f"Error! '{raw}' no es un número valido.")
+        messagebox.showerror("Error!", f"'{raw}' no es un número valido.")
         entry.focus_set()
         return None
 
     num = int(raw)
 
     if num < 1 or num > len(afns):
-        log_fun(f"Error: no existe un AFN con el numero {num}.")
+        messagebox.showerror("Error!", f"No existe un AFN con el numero {num}.")
         entry.focus_set()
         return None
     
@@ -42,10 +43,10 @@ def obtener_indice(entry, log_fun):
     return num
 
 def imprimir_afn(afn, log_fun):
-    log_fun("\n=== AFN ===\n")
-    log_fun(f"Estados totales: {len(afn.Estados)}")
-    log_fun(f"Estado inicial: {afn.EdoInicial.IdEdo}")
-    log_fun(f"Estados de aceptación: {[e.IdEdo for e in afn.EdosAceptacion]}")
+    log_fun("\n=== AFN RESULTANTE ===")
+    log_fun(f"Estados Totales: {len(afn.Estados)}")
+    log_fun(f"Estado Inicial: {afn.EdoInicial.IdEdo}")
+    log_fun(f"Estados de Aceptación: {[e.IdEdo for e in afn.EdosAceptacion]}")
     log_fun(f"Alfabeto: {sorted(afn.Alfabeto)}")
     for e in sorted(afn.Estados, key=lambda x: x.IdEdo):
         log_fun(f" Estado {e.IdEdo} (Acept: {e.EdoAcept}):")
@@ -54,42 +55,97 @@ def imprimir_afn(afn, log_fun):
             ss = t.SimboloSup
             dest = t.EdoDestino.IdEdo if t.EdoDestino is not None else None
             log_fun(f"   -> {si!r}-{ss!r} -> {dest}")
-    log_fun("\n===============\n")
+    log_fun("===============\n")
 
 def imprimir_afd(afd, log_fun):
-    log_fun("\n=== AFD RESULTANTE ===\n")
-    log_fun(f"Estados totales: {afd.NumEdos}")
-    log_fun(f"Estado inicial: {afd.EdoInicial}")
-    log_fun(f"Estados de aceptación: {afd.EdosAceptacion}")
+    log_fun("\n=== AFD RESULTANTE ===")
+    log_fun(f"Estados: {afd.NumEdos}")
+    log_fun(f"Estado Inicial: {afd.EdoInicial}")
+    log_fun(f"Estados de Aceptación: {afd.EdosAceptacion}")
     
     alfabeto_ordenado = sorted(afd.Alfabeto)
     log_fun(f"Alfabeto: {alfabeto_ordenado}\n")
 
     log_fun(f"* = Estado de Aceptación, > = Estado Inicial")
-    log_fun("\n==========================\n")
+    log_fun("=== TABLA DE TRANSICIONES ===")
+
+    # Definimos el ancho de las columnas
+    col_estado_w = 6
+    col_token_w = 8
+    col_simbolo_w = 8
+
+    # Encabezados
+    header_parts = ["Edo".ljust(col_estado_w)]
+    for s in alfabeto_ordenado:
+         header_parts.append(s.center(col_simbolo_w))
+    header_parts.append("TOKEN".ljust(col_token_w))
+            
+    header_str = f"| {' | '.join(header_parts)} |"
+    separator = "=" * len(header_str)
+            
+    # Escribir encabezado
+    log_fun(separator + "\n")
+    log_fun(header_str + "\n")
+    log_fun(separator + "\n")
+
+    # Filas de transiciones
+    for edo in afd.EdosAFD:
+        if edo is None or edo.id == -1 or edo.id >= afd.NumEdos:
+            continue
+                
+        # --- Columna ESTADO (Omitida para brevedad) ---
+        simbolo_edo = ""
+        if edo.id in afd.EdosAceptacion: 
+            simbolo_edo = "*"
+        if edo.id == afd.EdoInicial:
+            simbolo_edo = ">"
+                
+        fila = [f"{simbolo_edo}{edo.id}".ljust(col_estado_w)]
+        
+        # --- Columnas de TRANSICIONES (Alfabeto) (Omitida para brevedad) ---
+        for simbolo_char in alfabeto_ordenado:
+            idx = ord(simbolo_char)
+            destino = -1 # Trampa
+                    
+            if idx < len(edo.transAFD):
+                destino = edo.transAFD[idx]
+                    
+            destino_str = str(destino) if destino != -1 else "-"
+            fila.append(destino_str.center(col_simbolo_w))
+                
+        token = getattr(edo, 'Token', -1)    
+        token_val = str(token) if token != -1 else "-"  
+        fila.append(token_val.ljust(col_token_w))
+                
+        # Escribir la fila
+        log_fun(f"| {' | '.join(fila)} |\n")
+
+    log_fun(separator + "\n")
+    log_fun(f"* = Estado de Aceptación, > = Estado Inicial\n")
+    
+    log_fun("==========================\n")
 
 def guardarArchivo(afd_entry, log_fun, afds):
     if afd_entry is None:
-        log_fun("Error! No se ha detectado ninguna entrada en el AFD.")
+        messagebox.showerror("Error!", "No se ha detectado ninguna entrada en el AFD.")
         return
 
     raw = afd_entry.get().strip()
 
     if raw == "":
-        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
+        messagebox.showerror("Error!", "El campo está vacío. Ingrese un número válido.")
         afd_entry.focus_set()
         return None
 
     if not raw.isdigit():
-        log_fun(f"Error! '{raw}' no es un número valido.")
+        messagebox.showerror("Error!", f"'{raw}' no es un número válido.")
         afd_entry.focus_set()
         return None
 
     num = int(raw)
     
-    # Manejo del caso donde 'afds' no existe o está vacío.
     if not afds or num < 1 or num > len(afds):
-        log_fun(f"Error: no existe un AFD con el numero {num} o la lista de AFDs está vacía.")
+        messagebox.showerror("Error", f"No existe un AFD con el número {num} o la lista de AFDs está vacía.")
         afd_entry.focus_set()
         return None
     
@@ -99,212 +155,111 @@ def guardarArchivo(afd_entry, log_fun, afds):
 
     ruta = filedialog.asksaveasfilename(
         defaultextension=".txt",
-        initialfile="afd_resultado_tabla.txt",
+        initialfile="afd_r.txt",
         title="Guardar AFD como",
         filetypes=(("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*"))
     )
 
     if not ruta:
-        log_fun("Error! Guardado cancelado por el usuario.")
+        messagebox.showerror("Error!", "Guardado cancelado por el usuario.")
+        log_fun("Operación cancelada.\n")
         return
 
     try:
         with open(ruta, "w", encoding="utf-8") as archivo:
-            # 1. Información General
-            archivo.write("=== AFD GENERADO ===\n")
-            archivo.write(f"Estados: {afdG.NumEdos}\n")
-            archivo.write(f"Inicial: {afdG.EdoInicial}\n")
-            archivo.write(f"Aceptacion: {' '.join(str(e) for e in afdG.EdosAceptacion)}\n")
-            
-            alfabeto_ordenado = sorted(afdG.Alfabeto)
-            archivo.write(f"Alfabeto: {alfabeto_ordenado}\n\n") 
+            # Escribir los estados como numeros
+            archivo.write(" ".join(str(i) for i in range(afdG.NumEdos)) + "\n")
+            archivo.write(str(afdG.EdoInicial) + "\n")
+            archivo.write(" ".join(str(i) for i in afdG.EdosAceptacion) + "\n")
+            archivo.write(" ".join(sorted(afdG.Alfabeto)) + "\n")
 
-            #Tabla de transiciones
-            archivo.write("=== TABLA DE TRANSICIONES ===\n")
-            
-            # Determinar el ancho máximo para los estados y destinos
-            max_state_len = max(len(str(edo.id)) for edo in afdG.EdosAFD if edo and edo.id != -1) if afdG.EdosAFD else 2
-            max_token_len = max(len(str(getattr(edo, 'Token', '-1'))) for edo in afdG.EdosAFD if edo and edo.id != -1) if afdG.EdosAFD else 2
-            
-            # El ancho de la columna debe ser al menos 3 para cubrir los símbolos, estados y los guiones (-)
-            col_w = max(3, max_state_len, max_token_len)
-            
-            # Construir la primera fila (encabezado de transiciones)
-            header_symbols = ""
-            for s in alfabeto_ordenado:
-                # Usar center() para que los símbolos queden centrados en la columna
-                header_symbols += s.center(col_w) + " "
-            
-            # Escribir el encabezado del alfabeto
-            # Se añade un espacio antes para alinear con la primera columna de la tabla real (la de los estados)
-            archivo.write(" " * col_w + " " + header_symbols.rstrip() + "\n")
-            
-            # 2. Cuerpo de la matriz
+            # Tabla de transicion
             for edo in afdG.EdosAFD:
                 if edo is None or edo.id == -1 or edo.id >= afdG.NumEdos:
                     continue
                 
-                # --- Columna ESTADO ---
-                # Escribir el ID del estado (sin el símbolo > o *)
-                # Se utiliza ljust() para asegurar la alineación de la primera columna
-                fila_str = str(edo.id).ljust(col_w) + " "
-                
-                # --- Columnas de TRANSICIONES (Alfabeto) ---
-                for simbolo_char in alfabeto_ordenado:
-                    idx = ord(simbolo_char)
-                    destino = -1 # Trampa
-                    
+                fila_e = []
+
+                for simb in sorted(afdG.Alfabeto):
+                    idx = ord(simb)
+                    destino = -1
+
                     if idx < len(edo.transAFD):
                         destino = edo.transAFD[idx]
-                    
-                    # El destino puede ser un solo estado o una lista/conjunto de estados (para NFA, aunque aquí es AFD)
-                    # Usamos '-' si el destino es -1 (trampa)
+
                     destino_str = str(destino) if destino != -1 else "-"
-                    
-                    # El destino debe ser centrado en la columna
-                    fila_str += destino_str.center(col_w) + " "
-                
-                # --- Columna TOKEN ---
+
+                    fila_e.append(destino_str)
+
                 token = getattr(edo, 'Token', -1)
                 token_val = str(token) if token != -1 else "-"
-                
-                # El token debe ser centrado o alineado para mantener el formato de matriz
-                fila_str += token_val.center(col_w)
-                
-                # Escribir la fila
-                archivo.write(fila_str + "\n")
-            
-            archivo.write("\n")
-            archivo.write("\n==========================\n")
+
+                fila_e.append(token_val)
+
+                archivo.write(" ".join(fila_e) + "\n")
             
             messagebox.showinfo("Felicidades!", f"AFD guardado correctamente en: {ruta}\n")
+
+            log_fun("\n==========================")
             log_fun(f"AFD {num} guardado correctamente en {ruta}")
+            log_fun("==========================\n")
             
     except Exception as e:
-        messagebox.showinfo("Error!", f"No se ha podido guardar el AFD.\n")
+        messagebox.showerror("Error!", "No se ha podido guardar el AFD.")
         log_fun(f"Error! {e}.")
 
-
-""" Comentando mi hermosa creacion porque a la señorita no le gusta :c
-def guardarArchivo(afd_entry, log_fun):
-    if afd_entry is None:
-        log_fun("Error! No se ha detectado ninguna entrada en el AFD.")
-        return
-
-    raw = afd_entry.get().strip()
-
-    if raw == "":
-        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
-        afd_entry.focus_set()
-        return None
-
-    if not raw.isdigit():
-        log_fun(f"Error! '{raw}' no es un número valido.")
-        afd_entry.focus_set()
-        return None
-
-    num = int(raw)
-    
-    if num < 1 or num > len(afds):
-        log_fun(f"Error: no existe un AFD con el numero {num}.")
-        afd_entry.focus_set()
-        return None
-    
-    afd_entry.delete(0, tk.END)
-    
-    afdG = afds[num - 1] # Obtener el objeto AFD (índice 0-based)
-
-    ruta = filedialog.asksaveasfilename(
+def seleccionarAFD(ruta, log_fun):
+    r = filedialog.askopenfilename(
         defaultextension=".txt",
-        initialfile="afd_resultado_tabla.txt",
-        title="Guardar AFD como",
+        title="Seleccionar un AFD",
         filetypes=(("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*"))
     )
 
-    if not ruta:
-        log_fun("Error! Guardado cancelado por el usuario.")
+    if r:
+        ruta.set(r)
+        log_fun("\n==========================")
+        log_fun(f"Archivo cargado desde: {r}")
+        log_fun("==========================\n")
+    else:
+        messagebox.showerror("Error1", "La selección del AFD no es válida.")
+        ruta.set("")
         return
 
-    try:
-        with open(ruta, "w", encoding="utf-8") as archivo:
-            # 1. Información General
-            archivo.write("=== AFD GENERADO ===\n")
-            archivo.write(f"Estados: {afdG.NumEdos}\n")
-            archivo.write(f"Inicial: {afdG.EdoInicial}\n")
-            archivo.write(f"Aceptacion: {' '.join(str(e) for e in afdG.EdosAceptacion)}\n")
-            
-            alfabeto_ordenado = sorted(afdG.Alfabeto)
-            archivo.write(f"Alfabeto: {alfabeto_ordenado}\n\n") 
+def probarAFD(ruta, cad, log_fun):
+    if not ruta:
+        messagebox.showerror("Error!", "El archivo seleccionado no es válido.")
+        log_fun("Operación cancelada.\n")
+        return
+    
+    if cad is None:
+        messagebox.showerror("Error!", "No se ha detectado ninguna entrada en el AFD.")
+        return
 
-            #Tabla de transiciones
-            archivo.write("=== TABLA DE TRANSICIONES ===\n")
+    rutaArchivo = ruta.get().strip()
+    cad = cad.get().strip()
 
-            # Definir el ancho de las columnas
-            col_estado_w = 6
-            col_token_w = 8
-            col_simbolo_w = 8
-            
-            # Encabezados
-            header_parts = ["Edo".ljust(col_estado_w)]
-            for s in alfabeto_ordenado:
-                header_parts.append(s.center(col_simbolo_w))
-            header_parts.append("TOKEN".ljust(col_token_w))
-            
-            header_str = f"| {' | '.join(header_parts)} |"
-            separator = "=" * len(header_str)
-            
-            # Escribir encabezado
-            archivo.write(separator + "\n")
-            archivo.write(header_str + "\n")
-            archivo.write(separator + "\n")
+    if cad == "":
+        messagebox.showerror("Error!", "El campo está vacío. Ingrese un número válido.")
+        cad.focus_set()
+        return None
+    
+    afd = AFD()
+    afd.cargarArchivo(rutaArchivo)
 
-            # Filas de transiciones
-            for edo in afdG.EdosAFD:
-                if edo is None or edo.id == -1 or edo.id >= afdG.NumEdos:
-                    continue
-                
-                # --- Columna ESTADO (Omitida para brevedad) ---
-                simbolo_edo = ""
-                if edo.id in afdG.EdosAceptacion: 
-                    simbolo_edo = "*"
-                if edo.id == afdG.EdoInicial:
-                    simbolo_edo = ">"
-                
-                fila = [f"{simbolo_edo}{edo.id}".ljust(col_estado_w)]
-                
-                # --- Columnas de TRANSICIONES (Alfabeto) (Omitida para brevedad) ---
-                for simbolo_char in alfabeto_ordenado:
-                    idx = ord(simbolo_char)
-                    destino = -1 # Trampa
-                    
-                    if idx < len(edo.transAFD):
-                        destino = edo.transAFD[idx]
-                    
-                    destino_str = str(destino) if destino != -1 else "-"
-                    fila.append(destino_str.center(col_simbolo_w))
-                
-                token = getattr(edo, 'Token', -1)
-                
-                token_val = str(token) if token != -1 else "-"
-                
-                fila.append(token_val.ljust(col_token_w))
-                
-                # Escribir la fila
-                archivo.write(f"| {' | '.join(fila)} |\n")
+    res = afd.evaluarCad(cad)
 
-            archivo.write(separator + "\n")
-            archivo.write(f"* = Estado de Aceptación, > = Estado Inicial\n")
-            archivo.write("\n")
-            
-            archivo.write("\n==========================\n")
-            
-            messagebox.showinfo("Felicidades!", f"AFD guardado correctamente en: {ruta}\n")
-            log_fun(f"AFD {num} guardado correctamente en {ruta}")
-            
-    except Exception as e:
-        messagebox.showinfo("Error!", f"No se ha podido guardar el AFD.\n")
-        log_fun(f"Error! {e}.")
-"""
+    if(res == -1):
+        messagebox.showerror("Error!", f"No se han encontrado lexemas válidos para la cadena {cad}.")
+    else:
+        log_fun("\n==========================")
+        log_fun(f"Lexemas encontrados en {cad}")
+        
+        for x, y in res.items():
+            log_fun(f"{y} - {x}")
+
+        log_fun("==========================\n")
+
+
 # Opciones del AFN
 def crearBasico1(entry_widget, log_fun, cont_AFN):
     print("Opcion seleccionada de Crear Basico\n")
@@ -318,11 +273,11 @@ def crearBasico1(entry_widget, log_fun, cont_AFN):
     print(f"Token asignado automáticamente: {token_val}\n")
 
     if not caracter:
-        log_fun("Error! Debes ingresar al menos un caracter para crear un AFN basico")
+        messagebox.showerror("Error!", "Debes ingresar al menos un caracter para crear un AFN básico")
         return
 
     if len(caracter) > 1:
-        log_fun(f"Error! Se ha detectado mas de un caracter, se tomara solo el primero.\n")
+        messagebox.showerror("Error!", "Se ha detectado más de un caracter, se tomará solo el primero.")
         caracter = caracter[0]
         
     afn1 = AFN()
@@ -350,12 +305,12 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
     print(f"Token asignado automáticamente: {token_val}\n")
 
     if(not caracter1) and (not caracter2):
-        log_fun(f"Error! Debes ingresar al menos un caracter para crear un AFN basico")
+        messagebox.showerror("Error!", "Debes ingresar al menos un caracter para crear un AFN básico.")
+        entry_widget1.focus_set()
         return
-
     
     if (len(caracter1) > 1) or (len(caracter2) > 1):
-        log_fun(f"Error! Se ha detectado mas de un caracter, se tomara solo el primero.\n")
+        messagebox.showinfo("Error!", "Se ha detectado más de un caracter, se tomará sólo el primero.")
         caracter1 = caracter1[0]
         caracter2 = caracter2[0]
         
@@ -365,26 +320,62 @@ def crearBasico2(entry_widget1, entry_widget2, log_fun, cont_AFN):
 
     actualizarContador(cont_AFN)
 
-    log_fun(f"AFN Basico 2 creado para los caracteres: '{caracter1} - {caracter2}'")
+    log_fun(f"AFN Básico 2 creado para los caracteres: '{caracter1} - {caracter2}'")
     imprimir_afn(afn1, log_fun)
 
-    print(f"Numero de AFN's totales {len(afns)}\n")
+    print(f"Número de AFN's totales {len(afns)}\n")
+
+def unirAFN(afn1, afn2, log_fun, cont_AFN):
+    print("Opcion seleccionada unir AFN\n")
+
+    if(len(afns) < 2):
+        messagebox.showerror("Error!", "Se necesitan al menos 2 AFN's para realizar esta operación.")
+        return
+
+    num1 = obtener_indice(afn1)
+    num2 = obtener_indice(afn2)
+
+    if num1 is None:
+        messagebox.showerror("Error!", "Ingrese el número del AFN 1.")
+        afn1.focus_set()
+        return
+
+    if num2 is None:
+        messagebox.showerror("Error!", "Ingrese el número del AFN 2.")
+        afn2.focus_set()
+        return
+
+    if num1 == num2:
+        messagebox.showerror("Error!", "No se puede unir un AFN consigo mismo.")
+        return
+
+    a1 = afns[num1 - 1]
+    a2 = afns[num2 - 1]
+
+    a1.UnirAFN(a2)
+    afns.pop(num2 - 1)
+
+    actualizarContador(cont_AFN)
+
+    log_fun(f"Se ha creado la unión entre los AFN's {num1} y {num2}.")
+    imprimir_afn(a1, log_fun)
 
 def concatenarAFN(afn1, afn2, log_fun, cont_AFN):
     print("Opcion seleccionada concatenar AFN\n")
 
     if(len(afns) < 2):
-        log_fun("Error! Se necesitan al menos 2 AFN's para realizar esta operacion.")
+        messagebox.showerror("Error!", "Se necesitan al menos 2 AFN's para realizar esta operación.")
+        log_fun("Operación cancelada.\n")
         return
 
-    num1 = obtener_indice(afn1, log_fun)
-    num2 = obtener_indice(afn2, log_fun)
+    num1 = obtener_indice(afn1)
+    num2 = obtener_indice(afn2)
 
     if(num1 is None) or (num2 is None):
         return
 
     if(num1 == num2):
-        log_fun("Error! No se puede concatenar el AFN consigo mismo.")
+        messagebox.showerror("Error!", "No se puede concatenar el AFN consigo mismo.")
         return
 
     a1 = afns[num1 - 1]
@@ -395,17 +386,17 @@ def concatenarAFN(afn1, afn2, log_fun, cont_AFN):
 
     actualizarContador(cont_AFN)
 
-    log_fun(f"Se ha creado la concatenacion entre los AFN's.")
+    log_fun(f"Se ha creado la concatenación entre los AFN's.")
     imprimir_afn(a1, log_fun)
 
 def cerrPostiva(afn, log_fun):
     print("Opcion seleccionada cerradura positiva AFN\n")
 
     if(len(afns) < 1):
-        log_fun("Error! No hay AFN's disponibles.")
+        messagebox.showerror("Error!", "No hay AFN's disponibles.")
         return
     
-    num = obtener_indice(afn, log_fun)
+    num = obtener_indice(afn)
 
     if num is None:
         return
@@ -420,10 +411,10 @@ def cerrKleene(afn, log_fun):
     print("Opcion seleccionada cerradura de kleene AFN\n")
 
     if(len(afns) < 1):
-        log_fun("Error! No hay AFN's disponibles.")
+        messagebox.showerror("Error!", "No hay AFN's disponibles.")
         return
 
-    num = obtener_indice(afn, log_fun)
+    num = obtener_indice(afn)
 
     if num is None:
         return
@@ -438,10 +429,10 @@ def opcional(afn, log_fun):
     print("Opcion seleccionada opcional de un AFN\n")
 
     if(len(afns) < 1):
-        log_fun("Error! No hay AFN's disponibles.")
+        messagebox.showerror("Error!", "No hay AFN's disponibles.")
         return
 
-    num = obtener_indice(afn, log_fun)
+    num = obtener_indice(afn)
 
     if num is None:
         return
@@ -449,7 +440,7 @@ def opcional(afn, log_fun):
     a = afns[num - 1]
     
     a.Opcional()
-    log_fun(f"Se ha creado la operacion opcional del AFN.")
+    log_fun(f"Se ha creado la operación opcional del AFN.")
     imprimir_afn(a, log_fun)
 
 # Funciones para hacer los AFD
@@ -461,26 +452,26 @@ def unirAFNS(num_afns, log_fun, cont_AFN):
     raw = num_afns.get().strip()
     print("Entry obtenido ", raw)
     if raw == "":
-        log_fun("Error! El campo esta vacio. Ingrese un numero valido.")
+        messagebox.showerror("Error!", "El campo esta vacio. Ingrese un numero valido.")
         num_afns.focus_set()
         return
 
     try:
         indices = sorted(set(int(x.strip()) - 1 for x in raw.split(",")))
     except ValueError:
-        log_fun("Error! Solo se permiten numeros separados por comas y sin espacios.")
+        messagebox.showerror("Error!", "Solo se permiten números separados por comas y sin espacios.")
         num_afns.focus_set()
         return
     
     print("Indices obtenidos ", indices)
     for i in indices:
         if (i < 0) or (i >= len(afns)):
-            log_fun(f"Error! El indice {i + 1} no es valido.")
+            messagebox.showerror("Error!", f"El indice {i + 1} no es válido.")
             num_afns.focus_set()
             return
     
     if len(indices) < 2:
-        log_fun("Error! Se deben seleccionar al menos 2 AFN's para unir.")
+        messagebox.showerror("Error! Se deben seleccionar al menos 2 AFN's para unir.")
         num_afns.focus_set()
         return
     
@@ -496,13 +487,13 @@ def unirAFNS(num_afns, log_fun, cont_AFN):
     # Actualizar
     actualizarContador(cont_AFN)
     
-    log_fun(f"✅ Unión completada! AFN {i_base + 1} ahora contiene la unión.")
+    log_fun(f"Unión completada! El AFN {i_base + 1} ahora contiene la unión.")
     imprimir_afn(base_afn, log_fun)
 
 def hacerAFD(afn, log_fun, cont_AFD):
     print("Opcion seleccionada convertir a AFD\n")
 
-    num = obtener_indice(afn, log_fun)
+    num = obtener_indice(afn)
 
     a = afns[num - 1]
 
@@ -514,7 +505,6 @@ def hacerAFD(afn, log_fun, cont_AFD):
 
     log_fun(f"Se ha creado el AFD a partir del AFN {num}.")
     imprimir_afd(afd, log_fun)
-
 
 
 def main():
@@ -561,22 +551,24 @@ def main():
     notebookP = ttk.Notebook(panel_c)
     notebookP.pack(expand=True, fill="both", padx = 10, pady = 10)
 
-    pestaña1 = tk.Frame(notebookP, bg="lavender")
-    pestaña2 = tk.Frame(notebookP, bg="thistle1")
-    pestaña3 = tk.Frame(notebookP, bg="lightblue")
+    pestaña1 = tk.Frame(notebookP, bg = "lavender")
+    pestaña2 = tk.Frame(notebookP, bg = "thistle1")
+    pestaña3 = tk.Frame(notebookP, bg = "lightblue")
+    pestaña4 = tk.Frame(notebookP, bg = "ivory2")
 
     notebookP.add(pestaña1, text="AFN")
     notebookP.add(pestaña2, text="Convertir a un AFD")
     notebookP.add(pestaña3, text="Descargar")
+    notebookP.add(pestaña4, text="Probar AFD")
 
     # Contador de los AFD's
     cont_AFD = tk.StringVar()
-    cont_AFD.set(f"Numero total de AFD's: {len(afds)}")
+    cont_AFD.set(f"Número total de AFD's: {len(afds)}")
     tk.Label(panel_i, textvariable = cont_AFD, font=("Arial", 9, "bold"), fg = "snow4").pack(side = tk.LEFT, padx = 20)
 
     # Contador de los AFN's
     cont_AFN = tk.StringVar()
-    cont_AFN.set(f"Numero total de AFN's: {len(afns)}")
+    cont_AFN.set(f"Número total de AFN's: {len(afns)}")
     tk.Label(panel_i, textvariable = cont_AFN, font=("Arial", 9, "bold"), fg = "snow4").pack(side = tk.LEFT, padx = 20)
 
 
@@ -591,25 +583,39 @@ def main():
 
     # Unir AFN's
     tk.Label(sub1AFD, text=" Unir AFN's ", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
-    tk.Label(sub1AFD, text="Seleccione los AFN's a Unir:", bg="thistle1").pack()
+    tk.Label(sub1AFD, text="Seleccione los AFN's a Unir (índices separados por comas sin espacios):", bg="thistle1").pack()
     num_AFNS = tk.Entry(sub1AFD, width=5, justify='center')
     num_AFNS.pack(pady=5)
     tk.Button(sub1AFD, text="   Ejecutar   ", command = lambda: unirAFNS(num_AFNS, log_resultado, cont_AFN)).pack(pady=10)
 
-
     tk.Label(sub2AFD, text="Convertir a un AFD", font=("Arial", 11, "bold"), bg="thistle1").pack(pady=20)
-    tk.Label(sub2AFD, text="Ingrese el numero del AFN:", bg="thistle1").pack()
+    tk.Label(sub2AFD, text="Ingrese el número del AFN:", bg="thistle1").pack()
     num_AFN = tk.Entry(sub2AFD, width=5, justify='center')
     num_AFN.pack(pady=5)
     tk.Button(sub2AFD, text="   Ejecutar   ", command = lambda: hacerAFD(num_AFN, log_resultado, cont_AFN)).pack(pady=10)
 
+
     # Pestaña 3
     tk.Label(pestaña3, text="Descargar AFD a Txt", font=("Arial", 11, "bold"), bg="lightblue").pack(pady=20)
-    tk.Label(pestaña3, text="Ingrese el numero del AFD:", bg="lightblue").pack()
+    tk.Label(pestaña3, text="Ingrese el número del AFD:", bg="lightblue").pack()
     num_AFD = tk.Entry(pestaña3, width=5, justify='center')
     num_AFD.pack(pady=5)
     tk.Button(pestaña3, text="   Ejecutar   ", command=lambda: guardarArchivo(num_AFD, log_resultado, afds)).pack(pady=10)
 
+
+    # Pestaña 4
+    tk.Label(pestaña4, text="Probar AFD desde un archivo", font=("Arial", 11, "bold"), bg="ivory2").pack(pady=20)
+    tk.Label(pestaña4, text="Seleccione el archivo del AFD (.txt)", bg="ivory2").pack()
+
+    ruta = tk.StringVar(value="")
+    tk.Label(pestaña4, textvariable=ruta, bg="ivory2", fg="slate gray", wraplength=350, font=("Arial", 8, "italic")).pack(pady=5)
+    tk.Button(pestaña4, text="   Seleccionar Archivo AFD   ", command=lambda: seleccionarAFD(ruta, log_resultado)).pack(pady=10)
+
+    tk.Label(pestaña4, text="Ingresa una cadena de prueba para el AFD:", bg="ivory2").pack()
+    cad = tk.Entry(pestaña4, width=30, justify="center")
+    cad.pack(pady=5)
+    tk.Button(pestaña4, text="   Ejecutar   ", command=lambda: probarAFD(ruta, cad, log_resultado)).pack(pady=10)
+    
 
     # Subpestañas del AFN (Pestaña 1)
     notebookAFN = ttk.Notebook(pestaña1)
@@ -617,18 +623,20 @@ def main():
 
     sub1 = tk.Frame(notebookAFN, bg="lavender") # Crear basico 1
     sub2 = tk.Frame(notebookAFN, bg="lavender") # Crear basico 2
-    sub3 = tk.Frame(notebookAFN, bg="lavender") # Concatenar
-    sub4 = tk.Frame(notebookAFN, bg="lavender") # Cerradura +
-    sub5 = tk.Frame(notebookAFN, bg="lavender") # Cerradura *
-    sub6 = tk.Frame(notebookAFN, bg="lavender") # Opcional ?
+    sub3 = tk.Frame(notebookAFN, bg="lavender") # Unir (or)
+    sub4 = tk.Frame(notebookAFN, bg="lavender") # Concatenar (and)
+    sub5 = tk.Frame(notebookAFN, bg="lavender") # Cerradura +
+    sub6 = tk.Frame(notebookAFN, bg="lavender") # Cerradura *
+    sub7 = tk.Frame(notebookAFN, bg="lavender") # Opcional ?
 
     notebookAFN.add(sub1, text="Crear B1")
     notebookAFN.add(sub2, text="Crear B2")
-    notebookAFN.add(sub3, text="Concatenar")
-    notebookAFN.add(sub4, text="Cerradura +")
-    notebookAFN.add(sub5, text="Cerradura *")
-    notebookAFN.add(sub6, text="Opcional ?")
-    
+    notebookAFN.add(sub3, text="Unir")
+    notebookAFN.add(sub4, text="Concatenar")
+    notebookAFN.add(sub5, text="Cerradura +")
+    notebookAFN.add(sub6, text="Cerradura *")
+    notebookAFN.add(sub7, text="Opcional ?")
+
     # AFN Basico 1
     tk.Label(sub1, text=" AFN Basico 1 ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
     tk.Label(sub1, text="Ingrese un caracter:", bg="lavender").pack()
@@ -646,36 +654,46 @@ def main():
     ec3.pack(pady=5)
     tk.Button(sub2, text="   Ejecutar   ", command=lambda: crearBasico2(ec2, ec3, log_resultado, cont_AFN)).pack(pady=10)
 
-    # AFN Concatenar
-    tk.Label(sub3, text=" Concatenar AFN's ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub3, text="Ingrese el numero del AFN 1:", bg="lavender").pack()
+    # AFN Unir
+    tk.Label(sub3, text="Unir AFN's").pack(pady=20)
+    tk.Label(sub3, text="Ingrese el número del AFN 1:").pack()
     ec4 = tk.Entry(sub3, width=5, justify='center')
     ec4.pack(pady=5)
-    tk.Label(sub3, text="Ingrese el numero del AFN 2:", bg="lavender").pack()
+    tk.Label(sub3, text="Ingrese el número del AFN 2:").pack()
     ec5 = tk.Entry(sub3, width=5, justify='center')
     ec5.pack(pady=5)
-    tk.Button(sub3, text="   Ejecutar   ", command=lambda: concatenarAFN(ec4, ec5, log_resultado, cont_AFN)).pack(pady=10)
+    tk.Button(sub3, text="Ejecutar", command=lambda: unirAFN(ec4, ec5, log_resultado, cont_AFN)).pack(pady=10)
 
-    # AFN Cerradura Positiva
-    tk.Label(sub4, text=" Cerradura Positiva ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub4, text="Ingrese el numero del AFN:", bg="lavender").pack()
+    # AFN Concatenar
+    tk.Label(sub4, text="Concatenar AFN's").pack(pady=20)
+    tk.Label(sub4, text="Ingrese el número del AFN 1:").pack()
     ec6 = tk.Entry(sub4, width=5, justify='center')
     ec6.pack(pady=5)
-    tk.Button(sub4, text="   Ejecutar   ", command=lambda: cerrPostiva(ec6, log_resultado)).pack(pady=10)
+    tk.Label(sub4, text="Ingrese el número del AFN 2:").pack()
+    ec7 = tk.Entry(sub4, width=5, justify='center')
+    ec7.pack(pady=5)
+    tk.Button(sub4, text="Ejecutar", command=lambda: concatenarAFN(ec6, ec7, log_resultado, cont_AFN)).pack(pady=10)
+
+    # AFN Cerradura Positiva
+    tk.Label(sub5, text="Cerradura Positiva").pack(pady=20)
+    tk.Label(sub5, text="Ingrese el numero del AFN:").pack()
+    ec8 = tk.Entry(sub5, width=5, justify='center')
+    ec8.pack(pady=5)
+    tk.Button(sub5, text="Ejecutar", command=lambda: cerrPostiva(ec8, log_resultado)).pack(pady=10)
 
     # AFN Cerradura de Kleene
-    tk.Label(sub5, text=" Cerradura de Kleene ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub5, text="Ingrese el numero del AFN:", bg="lavender").pack()
-    ec7 = tk.Entry(sub5, width=5, justify='center')
-    ec7.pack(pady=5)
-    tk.Button(sub5, text="   Ejecutar   ", command=lambda: cerrKleene(ec7, log_resultado)).pack(pady=10)
+    tk.Label(sub6, text="Cerradura de Kleene").pack(pady=20)
+    tk.Label(sub6, text="Ingrese el número del AFN:").pack()
+    ec9 = tk.Entry(sub6, width=5, justify='center')
+    ec9.pack(pady=5)
+    tk.Button(sub6, text="Ejecutar", command=lambda: cerrKleene(ec9, log_resultado)).pack(pady=10)
 
     # AFN Opcional
-    tk.Label(sub6, text=" Opcional ", font=("Arial", 11, "bold"), bg="lavender").pack(pady=20)
-    tk.Label(sub6, text="Ingrese el numero del AFN:", bg="lavender").pack()
-    ec8 = tk.Entry(sub6, width=5, justify='center')
-    ec8.pack(pady=5)
-    tk.Button(sub6, text="   Ejecutar   ", command=lambda: opcional(ec8, log_resultado)).pack(pady=10)
+    tk.Label(sub7, text="Opcional").pack(pady=20)
+    tk.Label(sub7, text="Ingrese el número del AFN:").pack()
+    ec10 = tk.Entry(sub7, width=5, justify='center')
+    ec10.pack(pady=5)
+    tk.Button(sub7, text="Ejecutar", command=lambda: opcional(ec10, log_resultado)).pack(pady=10)
 
 
     ventana.mainloop()
