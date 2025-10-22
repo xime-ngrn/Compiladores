@@ -129,8 +129,7 @@ class AnalizadorLexico:
             self.FinLexema = self.IndiceCaracterActual
             self.IndiceCaracterActual += 1
             self.Token = -1
-            return -1
-
+            return "Error"
 
     def UndoToken(self):
         if self.Pila:
@@ -143,8 +142,7 @@ class AnalizadorLexico:
             ) = self.Pila.pop()
         else:
             print("No hay token para deshacer.")
-
-    
+   
     def GetEdoLexic(self):
         return {
             "IndiceCaracterActual": self.IndiceCaracterActual,
@@ -155,7 +153,6 @@ class AnalizadorLexico:
             "Pila": list(self.Pila)  # Copia de la pila
         }
 
-
     def SetEdoLexic(self, estado):
         self.IndiceCaracterActual = estado.get("IndiceCaracterActual", -1)
         self.Token = estado.get("Token", -1)
@@ -163,7 +160,6 @@ class AnalizadorLexico:
         self.IniLexema = estado.get("IniLexema", -1)
         self.FinLexema = estado.get("FinLexema", -1)
         self.Pila = list(estado.get("Pila", []))
-    
 
     def SetSigma(self, sigma):
         self.CadenaSigma = sigma
@@ -172,8 +168,7 @@ class AnalizadorLexico:
         self.FinLexema = -1
         self.IndiceCaracterActual = 0
         self.Token = -1
-        self.Pila.clear()
-        
+        self.Pila.clear()    
     
     def CadenaXAnalizar(self):
         return self.CadenaSigma[self.IndiceCaracterActual:]

@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 
 from AFN import AFN, EPSILON
 from AFD import AFD
+from AnalizadorLexico import AnalizadorLexico
 
 # Definimos una lista de los AFN y AFD que se van creando
 afns = []
@@ -57,7 +58,8 @@ def imprimir_afn(afn, log_fun):
             log_fun(f"   -> {si!r}-{ss!r} -> {dest}")
     log_fun("===============\n")
 
-def imprimir_afd(afd, log_fun):
+def imprimir_afd(lex, log_fun):
+    afd = lex.Automata
     log_fun("\n=== AFD RESULTANTE ===")
     log_fun(f"Estados: {afd.NumEdos}")
     log_fun(f"Estado Inicial: {afd.EdoInicial}")
@@ -151,7 +153,8 @@ def guardarArchivo(afd_entry, log_fun, afds):
     
     afd_entry.delete(0, tk.END)
     
-    afdG = afds[num - 1] 
+    lex = afds[num - 1]
+    afdG = lex.Automata 
 
     ruta = filedialog.asksaveasfilename(
         defaultextension=".txt",
@@ -243,10 +246,16 @@ def probarAFD(ruta, cad, log_fun):
         cad.focus_set()
         return None
     
-    afd = AFD()
-    afd.cargarArchivo(rutaArchivo)
+    lex = AnalizadorLexico()          # Nuevo
+    lex.CargarArchivoAFD(rutaArchivo) # Cargar el AFD desde archivo
+    lex.SetSigma(cad)                 # Inicializamos la cadena a analizar
+    res = []                          # Analizamos la cadena
+    while True:
+        token = lex.yylex()
+        if token == -1:
+            break
+        res.append((lex.yytext, token))
 
-    res = afd.evaluarCad(cad)
 
     if(res == -1):
         messagebox.showerror("Error!", f"No se han encontrado lexemas válidos para la cadena {cad}.")
@@ -254,7 +263,7 @@ def probarAFD(ruta, cad, log_fun):
         log_fun("\n==========================")
         log_fun(f"Lexemas encontrados en {cad}")
         
-        for x, y in res.items():
+        for x, y in res:
             log_fun(f"{x} : {y}")
 
         log_fun("==========================\n")
@@ -512,13 +521,15 @@ def hacerAFD(afn, log_fun, cont_AFD):
     a = afns[num - 1]
 
     afd = a.ConvertirAAFD()
-    afds.append(afd)
+    lex = AnalizadorLexico()
+    lex.Automata = afd
+    afds.append(lex)
 
     afns.pop(num - 1)
     actualizarContador2(cont_AFD)
 
     log_fun(f"Se ha creado el AFD a partir del AFN {num}.")
-    imprimir_afd(afd, log_fun)
+    imprimir_afd(lex, log_fun)
 
 
 def main():
