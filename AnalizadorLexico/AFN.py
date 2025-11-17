@@ -1,8 +1,8 @@
-from Estado import Estado
-from Transicion import Transicion
-from AFD import AFD
-from ElemSj import ElemSj
-from EdoAFD import EdoAFD
+from AnalizadorLexico.Estado import Estado
+from AnalizadorLexico.Transicion import Transicion
+from AnalizadorLexico.AFD import AFD
+from AnalizadorLexico.ElemSj import ElemSj
+from AnalizadorLexico.EdoAFD import EdoAFD
 from collections import deque
 
 EPSILON = 'ε'

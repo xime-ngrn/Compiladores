@@ -1,4 +1,4 @@
-from Estado import Estado
+from AnalizadorLexico.Estado import Estado
 
 class Transicion:
     def __init__(self, c_inf=None, c_sup=None, edoDestino=None):

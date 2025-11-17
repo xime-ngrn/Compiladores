@@ -1,4 +1,4 @@
-from EdoAFD import EdoAFD
+from AnalizadorLexico.EdoAFD import EdoAFD
 
 class AFD():
     def __init__(self, n=0):

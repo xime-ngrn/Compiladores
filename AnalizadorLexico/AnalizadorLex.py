@@ -1,7 +1,7 @@
-from AFD import AFD
-from EdoAFD import EdoAFD
+from AnalizadorLexico.AFD import AFD
+from AnalizadorLexico.EdoAFD import EdoAFD
 
-class AnalizadorLexico:
+class AnalizadorLex:
     def __init__(self, sigma="", FileAFD = None, IdAFD = None):
         self.Token = -1
         self.EdoActual = -1
