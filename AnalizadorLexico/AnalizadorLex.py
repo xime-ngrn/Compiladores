@@ -1,8 +1,8 @@
-from AnalizadorLexico.AFD import AFD
-from AnalizadorLexico.EdoAFD import EdoAFD
+from .AFD import AFD
+from .EdoAFD import EdoAFD
 
 class AnalizadorLex:
-    def __init__(self, sigma="", FileAFD = None, IdAFD = None):
+    def __init__(self, sigma=""):
         self.Token = -1
         self.EdoActual = -1
         self.EdoTransicion = -1
@@ -44,6 +44,7 @@ class AnalizadorLex:
                     transiciones_destino = partes[:num_simbolos]
                     
                     if len(partes) != num_simbolos + 1:
+                        print("ERROR AL CARGAR AFD")
                         print(f"Error de formato en la línea {i+5}!")
                         print(f"Esperado: {num_simbolos} transiciones + 1 token. Encontrado: {len(partes)}")
                         continue
@@ -58,7 +59,7 @@ class AnalizadorLex:
                     for idx_simb, simb in enumerate(simbolos_en_orden):
                         destino = transiciones_destino[idx_simb]
                         
-                        if destino != "-":
+                        if destino != "-" and destino != "-1":
                             self.Automata.EdosAFD[i].transAFD[ord(simb)] = int(destino)
 
         except FileNotFoundError:
@@ -68,9 +69,9 @@ class AnalizadorLex:
             
     def yylex(self):
         if self.IndiceCaracterActual >= len(self.CadenaSigma):
-            self.Token = -1
+            self.Token = 0
             self.yytext = ""
-            return -1
+            return 0  # Fin de cadena
 
         estados_por_id = {edo.id: edo for edo in self.Automata.EdosAFD if edo is not None}
         est_actual = self.Automata.EdoInicial
@@ -129,7 +130,7 @@ class AnalizadorLex:
             self.FinLexema = self.IndiceCaracterActual
             self.IndiceCaracterActual += 1
             self.Token = -1
-            return "Error"
+            return -1
 
     def UndoToken(self):
         if self.Pila:
@@ -172,3 +173,10 @@ class AnalizadorLex:
     
     def CadenaXAnalizar(self):
         return self.CadenaSigma[self.IndiceCaracterActual:]
+    
+    def Lexema(self):
+        return self.yytext
+
+    def HayMasTokens(self):
+        # Verifica si quedan más tokens por analizar
+        return self.IndiceCaracterActual < len(self.CadenaSigma)

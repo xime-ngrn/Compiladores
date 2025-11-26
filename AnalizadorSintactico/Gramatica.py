@@ -1,5 +1,6 @@
-from SimboloG import SimboloG
-from ReglaG import ReglaG
+from .SimboloG import SimboloG
+from .ReglaG import ReglaG
+
 class Gramatica():
     def __init__(self):
         self.NumReglas = 0

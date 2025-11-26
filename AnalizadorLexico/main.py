@@ -1,9 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from AFN import AFN, EPSILON
-from AFD import AFD
-from AnalizadorLexico import AnalizadorLexico
+from .AFN import AFN
+from .AnalizadorLex import AnalizadorLex
 
 # Definimos una lista de los AFN y AFD que se van creando
 afns = []
@@ -20,6 +19,7 @@ def actualizarContador2(cont_AFD):
 def obtener_indice(entry):
     if entry is None:
         messagebox.showerror("Error!", "No se ha detectado ningún Entry.")
+        return None
 
     raw = entry.get().strip()
     if raw == "":
@@ -243,21 +243,20 @@ def probarAFD(ruta, cad, log_fun):
 
     if cad == "":
         messagebox.showerror("Error!", "El campo está vacío. Ingrese un número válido.")
-        cad.focus_set()
         return None
     
-    lex = AnalizadorLexico()          # Nuevo
+    lex = AnalizadorLex()          # Nuevo
     lex.CargarArchivoAFD(rutaArchivo) # Cargar el AFD desde archivo
     lex.SetSigma(cad)                 # Inicializamos la cadena a analizar
     res = []                          # Analizamos la cadena
     while True:
         token = lex.yylex()
-        if token == -1:
+        if token == 0:
             break
         res.append((lex.yytext, token))
 
 
-    if(res == -1):
+    if(res == []):
         messagebox.showerror("Error!", f"No se han encontrado lexemas válidos para la cadena {cad}.")
     else:
         log_fun("\n==========================")
@@ -518,10 +517,13 @@ def hacerAFD(afn, log_fun, cont_AFD):
 
     num = obtener_indice(afn)
 
+    if num is None:
+        return
+
     a = afns[num - 1]
 
     afd = a.ConvertirAAFD()
-    lex = AnalizadorLexico()
+    lex = AnalizadorLex()
     lex.Automata = afd
     afds.append(lex)
 
