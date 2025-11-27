@@ -172,7 +172,7 @@ class Calculadora:
             "ATAN": math.atan,
             "LOG": math.log10,
             "LN": math.log,
-            "EXP_FN": math.exp,
+            "EXP": math.exp,
         }
 
         for nombre, fn in funciones.items():
