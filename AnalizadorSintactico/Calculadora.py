@@ -1,7 +1,6 @@
 # calculadora_parser.py
-"""Analizador sintáctico por descenso recursivo para una calculadora científica.
-Versión corregida: maneja lookahead correctamente, consume tokens en el lugar
-adecuado y considera fin de entrada cuando el token == 0 (o -1 mapeado a 0).
+"""
+Analizador sintáctico por descenso recursivo para una calculadora científica.
 Se construye la notación postfija y se evalúa la expresión numéricamente.
 """
 

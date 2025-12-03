@@ -1,111 +1,184 @@
+"""
+Analizador sintáctico para construir un AFN a partir de una expresión regular.
+Versión CORREGIDA con recursión adecuada en _Ep.
+"""
+
 from AnalizadorLexico.AFN import AFN
 from AnalizadorLexico.AnalizadorLex import AnalizadorLex
+from typing import Dict, Optional
 
-#Creacion del AFN a partir de una ER
 class ER_AFN:
-    def __init__(self, sigma):
-        self.ExpRegular = sigma
-        self.Res = None
-        self.L = AnalizadorLex(sigma)
+    def __init__(self, sigma: str, tokens: Dict[str, int], AFD_P: Optional[str]):
+        self.lex = AnalizadorLex()
+        self.tokens = tokens
+        self.exp_regular = sigma
+        self.result = None
 
-    def SetExpresion(self, sigma):
-        self.ExpRegular = sigma
-        self.L.SetSigma(sigma)
+        if AFD_P:
+            self.lex.CargarArchivoAFD(AFD_P)
 
-    def IniConversion(self):
-        self.L.SetSigma(self.ExpRegular)  # Inicializar lexer
-        f = AFN()
-        if self.E(f):
-            token = self.L.yylex()
-            if token == 0:
-                self.Res = f
-                return True
-        return False
+    def SetExpression(self, sigma: str) -> None:
+        """Establece una nueva expresión regular"""
+        self.exp_regular = sigma
+        self.lex.SetSigma(sigma)
 
-    def E(self, A1):
-        if self.T(A1):
-            if self.Ep(A1):
-                return True
-        return False
+    def IniConversion(self) -> Optional[AFN]:
+        """
+        Inicia la conversión de la expresión regular a AFN.
+        Retorna el AFN generado o None si hay error.
+        """
+        if not self.exp_regular:
+            print("Error: expresión regular vacía.")
+            self.result = None
+            return None
 
-    def Ep(self, A1):
-        token = self.L.yylex()
-        if token == 10:  # '|'
-            A2 = AFN()
-            if self.T(A2):
-                A1.UnirAFN(A2)
-                if self.Ep(A1):
-                    return True
-            return False
-        self.L.UndoToken()
-        return True
+        self.lex.SetSigma(self.exp_regular)
+        afn = AFN()
 
-    def T(self, A1):
-        if self.C(A1):
-            if self.Tp(A1):
-                return True
-        return False
+        try:
+            if self._E(afn):
+                token = self.lex.yylex()
+                if token == 0:  # Fin de cadena
+                    self.result = afn
+                    return self.result
+                raise SyntaxError(f"Error: se esperaba fin de cadena, se obtuvo token {token}")
+            raise SyntaxError("Error en el análisis de la expresión.")
+        except SyntaxError as se:
+            print(f"Error de sintaxis: {se}")
+            self.result = None
+            return None
+        except Exception as e:
+            print(f"Error inesperado durante el análisis: {e}")
+            import traceback
+            traceback.print_exc()
+            self.result = None
+            return None
 
-    def Tp(self, A1):
-        token = self.L.yylex()
-        if token == 20:  # concatenación (implícita)
-            A2 = AFN()
-            if self.C(A2):
-                A1.ConcatenarAFN(A2)
-                if self.Tp(A1):
-                    return True
-            return False
-        self.L.UndoToken()
-        return True
+    def _E(self, afn: AFN) -> bool:
+        """E → T Ep"""
+        return self._T(afn) and self._Ep(afn)
 
-    def C(self, A1):
-        if self.F(A1):
-            if self.Cp(A1):
-                return True
-        return False
+    def _Ep(self, afn: AFN) -> bool:
+        """ Ep → | T Ep | ε """
+        token = self.lex.yylex()
 
-    def Cp(self, A1):
-        token = self.L.yylex()
-        if token == 30:
-            A1.CerraduraPositiva()
-        elif token == 40:
-            A1.CerraduraKleene()
-        elif token == 50:
-            A1.Opcional()
-        else:
-            self.L.UndoToken()
-        return True
-
-    def F(self, A1):
-        token = self.L.yylex()
-        if token == 60:  # '('
-            if self.E(A1):
-                token = self.L.yylex()
-                if token == 70:  # ')'
-                    return True
-            return False
-        elif token == 80:  # símbolo normal
-            simb1 = self.L.yytext[0]
-            A1.CrearBasicoUno(simb1, 80)
+        if token == self.tokens['OR']:
+            afn2 = AFN()
+            if not self._T(afn2):
+                raise SyntaxError("Error al parsear término después de '|'")
+            if not self._Ep(afn2):
+                raise SyntaxError("Error en la recursión de Ep")
+            afn.UnirAFN(afn2)
             return True
-        elif token == 90:  # '['
-            token = self.L.yylex()
-            if token == 80:
-                simb1 = self.L.yytext[0]
-                token = self.L.yylex()
-                if token == 110:
-                    token = self.L.yylex()
-                    if token == 80:
-                        simb2 = self.L.yytext[0]
-                        token = self.L.yylex()
-                        if token == 100:
-                                                   # Verificamos que simb1 y simb2 sean válidos
-                            if (simb1.isdigit() and simb2.isdigit()) or \
-                            (simb1.islower() and simb2.islower()) or \
-                            (simb1.isupper() and simb2.isupper()):
-                                A1.CrearBasicoDos(simb1, simb2, 80)
-                            return True
-                        else:
-                            print(f"Error: Rango inválido '{simb1}-{simb2}'")
+        
+        # ε: solo hacer UndoToken si no es fin de cadena
+        if token != 0:
+            self.lex.UndoToken()
+        return True
+
+    def _T(self, afn: AFN) -> bool:
+        """T → C Tp"""
+        return self._C(afn) and self._Tp(afn)
+
+    def _Tp(self, afn: AFN) -> bool:
+        """
+        Tp → C Tp | ε }"""
+        token = self.lex.yylex()
+
+        if token in [self.tokens['SIMB'], self.tokens['PAR_I'], self.tokens['COR_I']]:
+            self.lex.UndoToken()
+            afn2 = AFN()
+            if not self._C(afn2):
+                return False
+            if not self._Tp(afn2):
+                return False
+            afn.ConcatenarAFN(afn2)
+            return True
+        
+        # ε: solo hacer UndoToken si no es fin de cadena
+        if token != 0:
+            self.lex.UndoToken()
+        return True
+
+    def _C(self, afn: AFN) -> bool:
+        """C → F Cp"""
+        return self._F(afn) and self._Cp(afn)
+
+    def _Cp(self, afn: AFN) -> bool:
+        """Cp → * | + | ? | ε"""
+        token = self.lex.yylex()
+        
+        if token == self.tokens['CERR_POS']:
+            afn.CerraduraPositiva()
+            return True
+        elif token == self.tokens['CERR_KLEEN']:
+            afn.CerraduraKleene()
+            return True
+        elif token == self.tokens['OPC']:
+            afn.Opcional()
+            return True
+        
+        # ε: solo hacer UndoToken si no es fin de cadena
+        if token != 0:
+            self.lex.UndoToken()
+        return True
+
+    def _F(self, afn: AFN) -> bool:
+        """F → (E) | symbol | [a-z]"""
+        token = self.lex.yylex()
+        
+        # Caso 1: (E)
+        if token == self.tokens['PAR_I']:
+            if self._E(afn):
+                token = self.lex.yylex()
+                if token == self.tokens['PAR_D']:
+                    return True
+                raise SyntaxError("Se esperaba ')' para cerrar el paréntesis")
             return False
-        return False
+        
+        # Caso 2: símbolo simple
+        elif token == self.tokens['SIMB']:
+            if not self.lex.yytext:
+                raise SyntaxError("Lexema vacío para símbolo")
+            simbolo = self.lex.yytext[0]
+            afn.CrearBasicoUno(simbolo, token)
+            return True
+        
+        # Caso 3: rango [a-z]
+        elif token == self.tokens['COR_I']:
+            return self._parsear_rango(afn)
+        
+        raise SyntaxError(f"Token inesperado: {token}. Se esperaba símbolo, '(' o '['")
+
+    def _parsear_rango(self, afn: AFN) -> bool:
+        """Parsea un rango del tipo [a-z]"""
+        token = self.lex.yylex()
+        if token != self.tokens['SIMB']:
+            raise SyntaxError("Se esperaba un símbolo después de '['")
+        
+        simb1 = self.lex.yytext[0]
+        
+        token = self.lex.yylex()
+        if token != self.tokens['GUION']:
+            raise SyntaxError("Se esperaba '-' en el rango")
+        
+        token = self.lex.yylex()
+        if token != self.tokens['SIMB']:
+            raise SyntaxError("Se esperaba un símbolo después de '-'")
+        
+        simb2 = self.lex.yytext[0]
+        
+        # Validar que el rango sea válido
+        if ord(simb1) > ord(simb2):
+            raise SyntaxError(f"Rango inválido: [{simb1}-{simb2}]. El primer carácter debe ser menor o igual al segundo")
+        
+        token = self.lex.yylex()
+        if token != self.tokens['COR_D']:
+            raise SyntaxError("Se esperaba ']' para cerrar el rango")
+        
+        afn.CrearBasicoDos(simb1, simb2, self.tokens['SIMB'])
+        return True
+
+    def GetAFN(self) -> Optional[AFN]:
+        """Devuelve el AFN resultante del análisis sintáctico"""
+        return self.result

@@ -9,7 +9,7 @@ class AnalizadorLex:
         self.PasoPorEdoAcept = False
         self.IniLexema = -1
         self.FinLexema = -1
-        self.IndiceCaracterActual = -1
+        self.IndiceCaracterActual = 0
         self.CaracterActual = ''
         self.Automata = AFD()
         self.yytext = ""
